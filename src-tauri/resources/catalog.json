@@ -1,0 +1,35 @@
+[
+  {
+    "id": "xinmeta",
+    "name": "2b2t.xin 官方 Meta",
+    "version": "1.1.0-RELEASE",
+    "pluginType": "META_PLUGIN",
+    "description": "为 2b2t.xin 提供登录、答题、队列和自动进入游戏",
+    "resource": "xinmetaplugin.jar",
+    "loginMode": "plugin",
+    "hostPatterns": ["2b2t.xin", "*.2b2t.xin"],
+    "recommended": true
+  },
+  {
+    "id": "directconnect",
+    "name": "DirectConnect 通用连接",
+    "version": "1.0.0",
+    "pluginType": "META_PLUGIN",
+    "description": "连接任意 Minecraft 服务器，支持自定义二次登录命令",
+    "resource": "directconnect.jar",
+    "loginMode": "template",
+    "hostPatterns": [],
+    "recommended": false
+  },
+  {
+    "id": "chatfilter",
+    "name": "ChatFilter",
+    "version": "1.0.0-RELEASE",
+    "pluginType": "PLUGIN",
+    "description": "聊天消息过滤插件",
+    "resource": "chatfilter.jar",
+    "loginMode": "none",
+    "hostPatterns": [],
+    "recommended": false
+  }
+]

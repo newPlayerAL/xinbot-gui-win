@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "XinBot",
+  "version": "0.2.5",
+  "identifier": "io.github.newplayeral.xinbot-gui-win",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "XinBot",
+        "width": 1180,
+        "height": 680,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true,
+        "decorations": false,
+        "resizable": true,
+        "shadow": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "useLocalToolsDir": true,
+    "resources": {
+      "resources/xinbot.jar": "resources/xinbot.jar",
+      "resources/directconnect.jar": "resources/directconnect.jar",
+      "resources/xinmetaplugin.jar": "resources/xinmetaplugin.jar",
+      "resources/chatfilter.jar": "resources/chatfilter.jar",
+      "resources/catalog.json": "resources/catalog.json",
+      "resources/official_plugins.json": "resources/official_plugins.json"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

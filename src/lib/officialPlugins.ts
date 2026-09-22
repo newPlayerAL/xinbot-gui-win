@@ -1,0 +1,30 @@
+import type { OfficialPluginCatalog } from "./types";
+
+// The official page is a human-readable table rather than a download manifest.
+// Keep this small snapshot for the offline preview; the packaged app reads the
+// same data from src-tauri/resources/official_plugins.json.
+export const officialPluginCatalog: OfficialPluginCatalog = {
+  sourceUrl: "https://xinbot.shouldbe.top/zh/guide/plugin-list",
+  updatedAt: "2026-09-22",
+  entries: [
+    { id: "xin-meta-plugin", name: "XinMetaPlugin", pluginType: "META_PLUGIN", supportedServers: ["2b2t.xin"], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/xinMetaPlugin", description: "2b2t.xin 服务器适配与登录流程。" },
+    { id: "3c3u-meta-plugin", name: "3c3uMetaPlugin", pluginType: "META_PLUGIN", supportedServers: ["3c3u.org"], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/3c3uMetaPlugin", description: "3c3u.org 服务器适配。" },
+    { id: "4d4v-meta-plugin", name: "4d4vMetaPlugin", pluginType: "META_PLUGIN", supportedServers: [], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/4d4vMetaPlugin", description: "社区服务器 Meta 适配插件。" },
+    { id: "cn-org-meta-plugin", name: "CnOrgMetaPlugin", pluginType: "META_PLUGIN", supportedServers: [], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/CnOrgMetaPlugin", description: "社区服务器 Meta 适配插件。" },
+    { id: "movement-sync", name: "MovementSync", pluginType: "PLUGIN", supportedServers: [], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/movementsync", description: "同步机器人移动状态的普通插件。" },
+    { id: "xin-remote", name: "xinRemote", pluginType: "PLUGIN", supportedServers: [], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/xinRemote", description: "提供远程控制接口的普通插件。" },
+    { id: "back-to-the-base", name: "BackToTheBase", pluginType: "PLUGIN", supportedServers: [], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/BackToTheBase", description: "回到基地相关的自动化插件。" },
+    { id: "envy", name: "Envy", pluginType: "PLUGIN", supportedServers: [], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/Envy", description: "XinBot 社区普通插件。" },
+    { id: "xin-claw", name: "XinClaw", pluginType: "PLUGIN", supportedServers: [], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/XinClaw", description: "XinBot 社区普通插件。" },
+    { id: "xin-pga", name: "XinPga", pluginType: "PLUGIN", supportedServers: [], maintainer: "2698269088", repositoryUrl: "https://github.com/2698269088/XinPga", description: "XinBot 社区普通插件。" },
+    { id: "xin-chat-command", name: "XinChatCommandPlugin", pluginType: "PLUGIN", supportedServers: [], maintainer: "2698269088", repositoryUrl: "https://github.com/2698269088/XinChatCommandPlugin", description: "聊天指令相关的普通插件。" },
+    { id: "survival-manager", name: "SurvivalManager", pluginType: "PLUGIN", supportedServers: [], maintainer: "giteer12", repositoryUrl: "https://github.com/giteer12/survivalmanager", description: "生存与挂机场景的管理插件。" },
+    { id: "xin-bls", name: "XinBls", pluginType: "PLUGIN", supportedServers: [], maintainer: "2698269088", repositoryUrl: "https://github.com/2698269088/XinBls", description: "XinBot 社区普通插件。" },
+    { id: "chat-filter", name: "ChatFilter", pluginType: "PLUGIN", supportedServers: [], maintainer: "newPlayerAL", repositoryUrl: "https://github.com/newPlayerAL/ChatFilter", description: "过滤聊天消息中的指定内容。" },
+    { id: "lan-connect", name: "LanConnect", pluginType: "META_PLUGIN", supportedServers: [], maintainer: "2698269088", repositoryUrl: "https://github.com/2698269088/Xin-LanConnect", description: "局域网服务器连接适配。" },
+    { id: "movement-mcp", name: "MovementMCP", pluginType: "PLUGIN", supportedServers: [], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/MovementMCP", description: "为移动控制提供 MCP 能力。" },
+    { id: "xin-via", name: "XinVia", pluginType: "PLUGIN", supportedServers: [], maintainer: "huangdihd", repositoryUrl: "https://github.com/huangdihd/XinVia", description: "XinBot 社区普通插件。" },
+    { id: "xin-player-monitor", name: "XinPlayerMonitor", pluginType: "PLUGIN", supportedServers: [], maintainer: "WaltomAdaam2", repositoryUrl: "https://github.com/WaltomAdaam2/XinPlayerMonitor", description: "监控服务器玩家状态。" },
+    { id: "xinbot-info-manage", name: "Xinbot_InfoManage", pluginType: "PLUGIN", supportedServers: [], maintainer: "YunXiaobo", repositoryUrl: "https://github.com/YunXiaobo/Xinbot_InfoManage", description: "管理 XinBot 运行信息。" },
+  ],
+};
