@@ -14,9 +14,11 @@
     listenBotConsole,
     listenBotState,
     listenRuntimeProgress,
+    readPluginConfig,
     sendBotCommand,
     stopBot,
     openPluginLink,
+    writePluginConfig,
   } from "./lib/api";
   import { officialPluginCatalog as previewOfficialPluginCatalog } from "./lib/officialPlugins";
   import type {
@@ -24,6 +26,7 @@
     BotConsoleEvent,
     LaunchRequest,
     OfficialPluginCatalog,
+    PluginConfigFile,
     PluginDescriptor,
     RuntimeProgress,
     RuntimeSource,
@@ -89,6 +92,13 @@
   let officialCatalog: OfficialPluginCatalog = previewOfficialPluginCatalog;
   let officialPluginQuery = "";
   let officialPluginTypeFilter: "all" | "PLUGIN" | "META_PLUGIN" = "all";
+  let pluginConfigPlugin: PluginDescriptor | null = null;
+  let pluginConfigPath = "";
+  let pluginConfigContent = "";
+  let pluginConfigExists = false;
+  let pluginConfigDirty = false;
+  let loadingPluginConfig = false;
+  let savingPluginConfig = false;
   let configTab: "connection" | "plugins" = "connection";
   let configurationCollapsed = false;
   let errorMessage = "";
@@ -108,6 +118,7 @@
   $: selectedBusy = selectedRunning || selectedLaunching;
   $: metaPlugins = plugins.filter((plugin) => plugin.pluginType === "META_PLUGIN");
   $: ordinaryPlugins = plugins.filter((plugin) => plugin.pluginType === "PLUGIN");
+  $: pluginConfigSpec = pluginConfigPlugin?.configFiles.find((file) => file.path === pluginConfigPath) ?? null;
   $: filteredOfficialPlugins = officialCatalog.entries.filter((plugin) => {
     const query = officialPluginQuery.trim().toLowerCase();
     const matchesType = officialPluginTypeFilter === "all" || plugin.pluginType === officialPluginTypeFilter;
@@ -222,6 +233,11 @@
     form = requestFrom(profile);
     savedSnapshot = JSON.stringify(form);
     errorMessage = "";
+    pluginConfigPlugin = null;
+    pluginConfigPath = "";
+    pluginConfigContent = "";
+    pluginConfigExists = false;
+    pluginConfigDirty = false;
     configTab = "connection";
     configurationCollapsed = false;
     consoleLines = consoleBuffers[id] ?? [initialConsoleLine(id)];
@@ -291,6 +307,66 @@
       errorMessage = String(error);
     } finally {
       importingPlugin = false;
+    }
+  }
+
+  async function openPluginConfig(plugin: PluginDescriptor, spec?: PluginConfigFile) {
+    const nextSpec = spec ?? plugin.configFiles[0];
+    if (!nextSpec) return;
+    if (pluginConfigDirty && !window.confirm("当前插件配置还有未保存的修改，确定切换吗？")) return;
+    pluginConfigPlugin = plugin;
+    pluginConfigPath = nextSpec.path;
+    pluginConfigContent = "";
+    pluginConfigExists = false;
+    pluginConfigDirty = false;
+    loadingPluginConfig = true;
+    errorMessage = "";
+    try {
+      const document = await readPluginConfig({
+        profileId: form.profileId,
+        host: form.host,
+        username: form.username,
+        pluginId: plugin.id,
+        path: nextSpec.path,
+      });
+      pluginConfigExists = document.exists;
+      pluginConfigContent = document.content;
+    } catch (error) {
+      errorMessage = String(error);
+      pluginConfigContent = "";
+    } finally {
+      loadingPluginConfig = false;
+    }
+  }
+
+  async function savePluginConfig() {
+    if (!pluginConfigPlugin || !pluginConfigSpec || !pluginConfigExists || loadingPluginConfig) return;
+    if (pluginConfigSpec.format === "json") {
+      try {
+        JSON.parse(pluginConfigContent);
+      } catch {
+        errorMessage = "插件配置不是有效 JSON，请修正后再保存。";
+        return;
+      }
+    }
+    savingPluginConfig = true;
+    errorMessage = "";
+    try {
+      const document = await writePluginConfig({
+        profileId: form.profileId,
+        host: form.host,
+        username: form.username,
+        pluginId: pluginConfigPlugin.id,
+        path: pluginConfigSpec.path,
+      }, pluginConfigContent);
+      pluginConfigExists = document.exists;
+      pluginConfigContent = document.content;
+      pluginConfigDirty = false;
+      showSaved();
+    } catch (error) {
+      errorMessage = String(error);
+    } finally {
+      savingPluginConfig = false;
     }
   }
 
@@ -652,9 +728,14 @@
                   <div class="group-heading"><b>M</b><div><strong>服务器 Meta 适配</strong><small>必选且只能选择一个，负责服务器特殊流程</small></div></div>
                   <div class="plugin-list">
                     {#each metaPlugins as plugin}
-                      <button type="button" class:selected={form.metaPluginId === plugin.id} class="plugin-card" onclick={() => selectMetaPlugin(plugin)}>
-                        <span class="plugin-radio"></span><span class="plugin-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}</small></span>{#if plugin.recommended}<em>推荐</em>{/if}
-                      </button>
+                      <div class="plugin-card-row">
+                        <button type="button" class:selected={form.metaPluginId === plugin.id} class="plugin-card" onclick={() => selectMetaPlugin(plugin)}>
+                          <span class="plugin-radio"></span><span class="plugin-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}</small></span>{#if plugin.recommended}<em>推荐</em>{/if}
+                        </button>
+                        {#if plugin.configFiles.length}
+                          <button type="button" class="plugin-config-button" onclick={() => void openPluginConfig(plugin)}>{plugin.configFiles.length > 1 ? "配置…" : "配置"}</button>
+                        {/if}
+                      </div>
                     {/each}
                   </div>
                 </div>
@@ -662,14 +743,38 @@
                   <div class="group-heading"><b>P</b><div><strong>普通插件</strong><small>按服务器分别选择，启动前自动同步</small></div></div>
                   <div class="plugin-list">
                     {#each ordinaryPlugins as plugin}
-                      <button type="button" class:selected={form.enabledPluginIds.includes(plugin.id)} class="plugin-card" onclick={() => togglePlugin(plugin.id)}>
-                        <span class="plugin-check">{form.enabledPluginIds.includes(plugin.id) ? "✓" : ""}</span><span class="plugin-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}</small></span>
-                      </button>
+                      <div class="plugin-card-row">
+                        <button type="button" class:selected={form.enabledPluginIds.includes(plugin.id)} class="plugin-card" onclick={() => togglePlugin(plugin.id)}>
+                          <span class="plugin-check">{form.enabledPluginIds.includes(plugin.id) ? "✓" : ""}</span><span class="plugin-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}</small></span>
+                        </button>
+                        {#if plugin.configFiles.length}
+                          <button type="button" class="plugin-config-button" onclick={() => void openPluginConfig(plugin)}>{plugin.configFiles.length > 1 ? "配置…" : "配置"}</button>
+                        {/if}
+                      </div>
                     {:else}
                       <p class="empty-plugins">尚未发现普通插件。</p>
                     {/each}
                   </div>
                   <p class="field-note">插件在左侧“插件管理”中统一下载或导入；这里仅选择当前服务器要启用的插件。</p>
+                  {#if pluginConfigPlugin && pluginConfigSpec}
+                    <div class="plugin-config-editor">
+                      <div class="plugin-config-editor-heading">
+                        <div><strong>{pluginConfigSpec.label || pluginConfigPlugin.name}</strong><small>{pluginConfigPlugin.name} · {pluginConfigPath}</small></div>
+                        <span class:exists={pluginConfigExists}>{pluginConfigExists ? "已创建" : "待创建"}</span>
+                      </div>
+                      <textarea
+                        value={pluginConfigContent}
+                        oninput={(event) => { pluginConfigContent = (event.currentTarget as HTMLTextAreaElement).value; pluginConfigDirty = true; }}
+                        disabled={!pluginConfigExists || loadingPluginConfig || savingPluginConfig}
+                        spellcheck="false"
+                        aria-label={`${pluginConfigPlugin.name} 配置内容`}
+                      ></textarea>
+                      <div class="plugin-config-editor-footer">
+                        <span>{loadingPluginConfig ? "正在读取…" : !pluginConfigExists ? "尚未生成；请先启动一次服务器，再点击配置重新读取" : pluginConfigDirty ? "有未保存的修改" : "使用插件原生配置路径"}</span>
+                        <button type="button" class="plugin-config-save" disabled={!pluginConfigExists || loadingPluginConfig || savingPluginConfig || !pluginConfigDirty} onclick={() => void savePluginConfig()}>{savingPluginConfig ? "保存中…" : "保存配置"}</button>
+                      </div>
+                    </div>
+                  {/if}
                 </div>
               {/if}
             </fieldset>

@@ -439,7 +439,7 @@ fn profile_id_for_request(request: &LaunchRequest) -> String {
     }
 }
 
-fn instance_id(host: &str, username: &str, profile_id: &str) -> String {
+pub(crate) fn instance_id(host: &str, username: &str, profile_id: &str) -> String {
     let mut hash = Sha256::new();
     hash.update(host.trim().to_ascii_lowercase());
     hash.update([0]);

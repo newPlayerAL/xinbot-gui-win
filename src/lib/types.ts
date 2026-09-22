@@ -51,6 +51,30 @@ export interface PluginDescriptor {
   loginMode: "plugin" | "template" | "none";
   hostPatterns: string[];
   recommended: boolean;
+  dependencies: string[];
+  configFiles: PluginConfigFile[];
+}
+
+export interface PluginConfigFile {
+  path: string;
+  format: string;
+  label: string;
+}
+
+export interface PluginConfigRequest {
+  profileId: string;
+  host: string;
+  username: string;
+  pluginId: string;
+  path: string;
+}
+
+export interface PluginConfigDocument {
+  pluginId: string;
+  path: string;
+  format: string;
+  exists: boolean;
+  content: string;
 }
 
 export interface OfficialPluginEntry {

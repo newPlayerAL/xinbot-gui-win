@@ -6,6 +6,8 @@ import type {
   BotStateEvent,
   LaunchRequest,
   OfficialPluginCatalog,
+  PluginConfigDocument,
+  PluginConfigRequest,
   PluginDescriptor,
   RuntimeProgress,
   RuntimeSource,
@@ -59,9 +61,9 @@ export async function getRuntimeSources(): Promise<RuntimeSource[]> {
 export async function listAvailablePlugins(): Promise<PluginDescriptor[]> {
   if (!inTauri()) {
     return [
-      { id: "xinmeta", name: "XinMetaPlugin", version: "1.1.0-RELEASE", pluginType: "META_PLUGIN", description: "2b2t.xin 官方适配", source: "bundled", resource: "xinmetaplugin.jar", loginMode: "plugin", hostPatterns: ["2b2t.xin"], recommended: true },
-      { id: "directconnect", name: "DirectConnect", version: "1.0.0-RELEASE", pluginType: "META_PLUGIN", description: "通用服务器直连适配", source: "bundled", resource: "directconnect.jar", loginMode: "template", hostPatterns: [], recommended: false },
-      { id: "chatfilter", name: "ChatFilter", version: "1.0.0-RELEASE", pluginType: "PLUGIN", description: "聊天消息过滤插件", source: "bundled", resource: "chatfilter.jar", loginMode: "none", hostPatterns: [], recommended: false },
+      { id: "xinmeta", name: "XinMetaPlugin", version: "1.1.0-RELEASE", pluginType: "META_PLUGIN", description: "2b2t.xin 官方适配", source: "bundled", resource: "xinmetaplugin.jar", loginMode: "plugin", hostPatterns: ["2b2t.xin"], recommended: true, dependencies: [], configFiles: [] },
+      { id: "directconnect", name: "DirectConnect", version: "1.0.0-RELEASE", pluginType: "META_PLUGIN", description: "通用服务器直连适配", source: "bundled", resource: "directconnect.jar", loginMode: "template", hostPatterns: [], recommended: false, dependencies: [], configFiles: [] },
+      { id: "chatfilter", name: "ChatFilter", version: "1.0.0-RELEASE", pluginType: "PLUGIN", description: "聊天消息过滤插件", source: "bundled", resource: "chatfilter.jar", loginMode: "none", hostPatterns: [], recommended: false, dependencies: [], configFiles: [] },
     ];
   }
   return invoke<PluginDescriptor[]>("list_available_plugins");
@@ -83,6 +85,35 @@ export async function openPluginLink(url: string): Promise<void> {
 
 export async function importPlugin(path: string): Promise<PluginDescriptor> {
   return invoke<PluginDescriptor>("import_plugin", { path });
+}
+
+export async function readPluginConfig(request: PluginConfigRequest): Promise<PluginConfigDocument> {
+  if (!inTauri()) {
+    return {
+      pluginId: request.pluginId,
+      path: request.path,
+      format: "json",
+      exists: false,
+      content: "",
+    };
+  }
+  return invoke<PluginConfigDocument>("read_plugin_config", { request });
+}
+
+export async function writePluginConfig(
+  request: PluginConfigRequest,
+  content: string,
+): Promise<PluginConfigDocument> {
+  if (!inTauri()) {
+    return {
+      pluginId: request.pluginId,
+      path: request.path,
+      format: "json",
+      exists: true,
+      content,
+    };
+  }
+  return invoke<PluginConfigDocument>("write_plugin_config", { request, content });
 }
 
 export async function installRuntime(source: string): Promise<AppStatus> {

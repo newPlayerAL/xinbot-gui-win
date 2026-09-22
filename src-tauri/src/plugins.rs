@@ -17,6 +17,16 @@ const META_PLUGIN: &str = "META_PLUGIN";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PluginConfigFile {
+    pub path: String,
+    #[serde(default = "default_config_format")]
+    pub format: String,
+    #[serde(default)]
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PluginDescriptor {
     pub id: String,
     pub name: String,
@@ -35,6 +45,10 @@ pub struct PluginDescriptor {
     pub host_patterns: Vec<String>,
     #[serde(default)]
     pub recommended: bool,
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    #[serde(default)]
+    pub config_files: Vec<PluginConfigFile>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,10 +78,161 @@ fn default_version() -> String {
     "未知版本".to_string()
 }
 
+fn default_config_format() -> String {
+    "text".to_string()
+}
+
 #[tauri::command]
 pub fn list_available_plugins(app: AppHandle) -> Result<Vec<PluginDescriptor>, String> {
     let paths = AppPaths::resolve(&app)?;
     collect_plugins(&paths)
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginConfigRequest {
+    pub profile_id: String,
+    pub host: String,
+    pub username: String,
+    pub plugin_id: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginConfigDocument {
+    pub plugin_id: String,
+    pub path: String,
+    pub format: String,
+    pub exists: bool,
+    pub content: String,
+}
+
+#[tauri::command]
+pub fn read_plugin_config(
+    app: AppHandle,
+    request: PluginConfigRequest,
+) -> Result<PluginConfigDocument, String> {
+    let paths = AppPaths::resolve(&app)?;
+    let (plugin, relative_path) = resolve_config_file(&paths, &request)?;
+    let target = instance_config_path(&paths, &request).join(&relative_path);
+    if !target.exists() {
+        return Ok(PluginConfigDocument {
+            plugin_id: plugin.id.clone(),
+            path: relative_path,
+            format: config_format(&plugin, &request.path),
+            exists: false,
+            content: String::new(),
+        });
+    }
+    let metadata = fs::metadata(&target).map_err(|error| format!("无法读取插件配置：{error}"))?;
+    if metadata.len() > 1024 * 1024 {
+        return Err("插件配置超过 1 MiB，暂不通过编辑器打开".to_string());
+    }
+    let content =
+        fs::read_to_string(&target).map_err(|error| format!("无法读取插件配置：{error}"))?;
+    Ok(PluginConfigDocument {
+        plugin_id: plugin.id.clone(),
+        path: relative_path,
+        format: config_format(&plugin, &request.path),
+        exists: true,
+        content,
+    })
+}
+
+#[tauri::command]
+pub fn write_plugin_config(
+    app: AppHandle,
+    request: PluginConfigRequest,
+    content: String,
+) -> Result<PluginConfigDocument, String> {
+    if content.len() > 1024 * 1024 {
+        return Err("插件配置超过 1 MiB，无法保存".to_string());
+    }
+    let paths = AppPaths::resolve(&app)?;
+    let (plugin, relative_path) = resolve_config_file(&paths, &request)?;
+    let instance_dir = instance_config_path(&paths, &request);
+    fs::create_dir_all(&instance_dir).map_err(|error| format!("无法创建插件运行目录：{error}"))?;
+    let target = instance_dir.join(&relative_path);
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("无法创建插件配置目录：{error}"))?;
+    }
+    let temporary = target.with_extension(format!(
+        "{}tmp",
+        target
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("")
+    ));
+    fs::write(&temporary, &content).map_err(|error| format!("无法写入插件配置：{error}"))?;
+    if target.exists() {
+        fs::remove_file(&target).map_err(|error| {
+            let _ = fs::remove_file(&temporary);
+            format!("无法替换插件配置：{error}")
+        })?;
+    }
+    fs::rename(&temporary, &target).map_err(|error| format!("无法完成插件配置保存：{error}"))?;
+    Ok(PluginConfigDocument {
+        plugin_id: plugin.id.clone(),
+        path: relative_path,
+        format: config_format(&plugin, &request.path),
+        exists: true,
+        content,
+    })
+}
+
+fn resolve_config_file(
+    paths: &AppPaths,
+    request: &PluginConfigRequest,
+) -> Result<(PluginDescriptor, String), String> {
+    let plugins = collect_plugins(paths)?;
+    let plugin = plugins
+        .iter()
+        .find(|plugin| plugin.id == request.plugin_id)
+        .ok_or_else(|| format!("找不到插件：{}", request.plugin_id))?;
+    let relative_path = request.path.trim();
+    if relative_path.is_empty() {
+        return Err("插件配置路径不能为空".to_string());
+    }
+    let spec = plugin
+        .config_files
+        .iter()
+        .find(|config| config.path == relative_path)
+        .ok_or_else(|| format!("插件未声明配置文件：{}", relative_path))?;
+    if !is_safe_relative_path(&spec.path) {
+        return Err(format!("插件配置路径无效：{}", spec.path));
+    }
+    Ok((plugin.clone(), relative_path.to_string()))
+}
+
+fn is_safe_relative_path(path: &str) -> bool {
+    let candidate = Path::new(path);
+    !path.is_empty()
+        && path.len() <= 240
+        && !candidate.is_absolute()
+        && candidate
+            .components()
+            .all(|component| matches!(component, std::path::Component::Normal(_)))
+}
+
+fn instance_config_path(paths: &AppPaths, request: &PluginConfigRequest) -> PathBuf {
+    paths
+        .data_dir
+        .join("instances")
+        .join(crate::process::instance_id(
+            &request.host,
+            &request.username,
+            &request.profile_id,
+        ))
+}
+
+fn config_format(plugin: &PluginDescriptor, path: &str) -> String {
+    plugin
+        .config_files
+        .iter()
+        .find(|config| config.path == path)
+        .map(|config| config.format.clone())
+        .unwrap_or_else(default_config_format)
 }
 
 #[tauri::command]
@@ -176,7 +341,7 @@ pub fn import_plugin(app: AppHandle, path: String) -> Result<PluginDescriptor, S
     let destination = paths.plugin_library_dir.join(format!("{id}.jar"));
     fs::copy(&source, &destination).map_err(|error| format!("无法导入插件：{error}"))?;
 
-    Ok(PluginDescriptor {
+    let mut descriptor = PluginDescriptor {
         id: id.clone(),
         name: metadata.name,
         version: metadata.version,
@@ -197,7 +362,11 @@ pub fn import_plugin(app: AppHandle, path: String) -> Result<PluginDescriptor, S
         },
         host_patterns: Vec::new(),
         recommended: false,
-    })
+        dependencies: Vec::new(),
+        config_files: Vec::new(),
+    };
+    apply_known_plugin_config(&mut descriptor);
+    Ok(descriptor)
 }
 
 pub fn sync_server_plugins(
@@ -336,22 +505,28 @@ fn collect_plugins(paths: &AppPaths) -> Result<Vec<PluginDescriptor>, String> {
                 continue;
             }
             match read_plugin_metadata(&path) {
-                Ok(metadata) => plugins.push(PluginDescriptor {
-                    id: id.clone(),
-                    name: metadata.name,
-                    version: metadata.version,
-                    plugin_type: metadata.plugin_type.clone(),
-                    description: "用户导入的插件".to_string(),
-                    source: "imported".to_string(),
-                    resource: format!("{id}.jar"),
-                    login_mode: if metadata.plugin_type == META_PLUGIN {
-                        "plugin".to_string()
-                    } else {
-                        "none".to_string()
-                    },
-                    host_patterns: Vec::new(),
-                    recommended: false,
-                }),
+                Ok(metadata) => {
+                    let mut descriptor = PluginDescriptor {
+                        id: id.clone(),
+                        name: metadata.name,
+                        version: metadata.version,
+                        plugin_type: metadata.plugin_type.clone(),
+                        description: "用户导入的插件".to_string(),
+                        source: "imported".to_string(),
+                        resource: format!("{id}.jar"),
+                        login_mode: if metadata.plugin_type == META_PLUGIN {
+                            "plugin".to_string()
+                        } else {
+                            "none".to_string()
+                        },
+                        host_patterns: Vec::new(),
+                        recommended: false,
+                        dependencies: Vec::new(),
+                        config_files: Vec::new(),
+                    };
+                    apply_known_plugin_config(&mut descriptor);
+                    plugins.push(descriptor);
+                }
                 Err(_) => continue,
             }
         }
@@ -395,7 +570,23 @@ fn normalize_descriptor(plugin: &mut PluginDescriptor) -> Result<(), String> {
     {
         return Err(format!("插件 {} 的资源路径无效", plugin.name));
     }
+    apply_known_plugin_config(plugin);
     Ok(())
+}
+
+fn apply_known_plugin_config(plugin: &mut PluginDescriptor) {
+    if plugin.name.eq_ignore_ascii_case("BackToTheBase") {
+        if plugin.dependencies.is_empty() {
+            plugin.dependencies.push("MovementSync".to_string());
+        }
+        if plugin.config_files.is_empty() {
+            plugin.config_files.push(PluginConfigFile {
+                path: "base_config.json".to_string(),
+                format: "json".to_string(),
+                label: "BackToTheBase 配置".to_string(),
+            });
+        }
+    }
 }
 
 fn source_path(paths: &AppPaths, plugin: &PluginDescriptor) -> Result<PathBuf, String> {

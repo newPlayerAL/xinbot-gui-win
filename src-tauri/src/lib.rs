@@ -3,7 +3,10 @@ mod plugins;
 mod process;
 mod runtime;
 
-use plugins::{import_plugin, list_available_plugins, list_official_plugins, open_plugin_link};
+use plugins::{
+    import_plugin, list_available_plugins, list_official_plugins, open_plugin_link,
+    read_plugin_config, write_plugin_config,
+};
 use process::{launch_bot, send_bot_command, stop_bot, ProcessState};
 use runtime::{get_app_status, get_runtime_sources, install_runtime};
 use tauri::Manager;
@@ -26,6 +29,8 @@ pub fn run() {
             list_official_plugins,
             open_plugin_link,
             import_plugin,
+            read_plugin_config,
+            write_plugin_config,
             launch_bot,
             send_bot_command,
             stop_bot
