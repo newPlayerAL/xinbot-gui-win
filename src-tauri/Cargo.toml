@@ -1,6 +1,6 @@
 [package]
 name = "xinbot-gui-win"
-version = "0.2.5"
+version = "0.2.6"
 description = "A lightweight Windows control center for XinBot"
 authors = ["newPlayerAL"]
 license = "GPL-3.0-or-later"

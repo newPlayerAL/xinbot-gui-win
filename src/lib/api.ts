@@ -116,6 +116,13 @@ export async function writePluginConfig(
   return invoke<PluginConfigDocument>("write_plugin_config", { request, content });
 }
 
+export async function initializePluginConfigs(request: LaunchRequest): Promise<void> {
+  if (!inTauri()) {
+    throw new Error("浏览器预览模式不会运行插件初始化");
+  }
+  await invoke("initialize_plugin_configs", { request });
+}
+
 export async function installRuntime(source: string): Promise<AppStatus> {
   if (!inTauri()) {
     throw new Error("浏览器预览模式不会实际下载 JRE");

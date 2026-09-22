@@ -412,6 +412,46 @@ pub fn sync_server_plugins(
         selected.push(plugin.clone());
     }
 
+    let mut dependency_cursor = 0;
+    while dependency_cursor < selected.len() {
+        let dependent = selected[dependency_cursor].clone();
+        dependency_cursor += 1;
+        for dependency_name in &dependent.dependencies {
+            let normalized = dependency_name.to_ascii_lowercase();
+            if names.contains(&normalized) {
+                continue;
+            }
+            let matches: Vec<&PluginDescriptor> = available
+                .iter()
+                .filter(|plugin| plugin.name.eq_ignore_ascii_case(dependency_name))
+                .collect();
+            let dependency = match matches.as_slice() {
+                [] => {
+                    return Err(format!(
+                        "插件 {} 缺少依赖 {}，请先在插件管理中导入该插件",
+                        dependent.name, dependency_name
+                    ));
+                }
+                [dependency] => *dependency,
+                _ => {
+                    return Err(format!(
+                        "插件依赖 {} 存在多个同名版本，请只保留一个",
+                        dependency_name
+                    ));
+                }
+            };
+            if dependency.plugin_type == META_PLUGIN {
+                return Err(format!(
+                    "插件 {} 的依赖 {} 是 Meta 插件，无法自动加载",
+                    dependent.name, dependency.name
+                ));
+            }
+            ids.insert(dependency.id.clone());
+            names.insert(normalized);
+            selected.push(dependency.clone());
+        }
+    }
+
     let mut sources = Vec::with_capacity(selected.len());
     for plugin in &selected {
         let source = source_path(&paths, plugin)?;

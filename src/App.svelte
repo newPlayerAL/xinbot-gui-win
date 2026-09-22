@@ -8,6 +8,7 @@
     getStatus,
     importPlugin,
     inTauri,
+    initializePluginConfigs,
     installRuntime,
     launchBot,
     listAvailablePlugins,
@@ -99,6 +100,7 @@
   let pluginConfigDirty = false;
   let loadingPluginConfig = false;
   let savingPluginConfig = false;
+  let initializingPluginProfileIds = new Set<string>();
   let configTab: "connection" | "plugins" = "connection";
   let configurationCollapsed = false;
   let errorMessage = "";
@@ -115,7 +117,8 @@
   $: runtimeReady = status?.runtimeState === "ready";
   $: selectedRunning = Boolean(status?.runningInstanceIds?.includes(selectedServerId));
   $: selectedLaunching = launchingProfileIds.has(selectedServerId);
-  $: selectedBusy = selectedRunning || selectedLaunching;
+  $: selectedInitializing = initializingPluginProfileIds.has(selectedServerId);
+  $: selectedBusy = selectedRunning || selectedLaunching || selectedInitializing;
   $: metaPlugins = plugins.filter((plugin) => plugin.pluginType === "META_PLUGIN");
   $: ordinaryPlugins = plugins.filter((plugin) => plugin.pluginType === "PLUGIN");
   $: pluginConfigSpec = pluginConfigPlugin?.configFiles.find((file) => file.path === pluginConfigPath) ?? null;
@@ -370,6 +373,36 @@
     }
   }
 
+  async function generatePluginConfig() {
+    if (!pluginConfigPlugin || !pluginConfigSpec || selectedBusy) return;
+    const profileId = selectedServerId;
+    const plugin = pluginConfigPlugin;
+    const spec = pluginConfigSpec;
+    const request: LaunchRequest = {
+      ...form,
+      metaPluginId: plugin.pluginType === "META_PLUGIN" ? plugin.id : form.metaPluginId,
+      enabledPluginIds: plugin.pluginType === "PLUGIN" && !form.enabledPluginIds.includes(plugin.id)
+        ? [...form.enabledPluginIds, plugin.id]
+        : [...form.enabledPluginIds],
+    };
+    initializingPluginProfileIds = new Set([...initializingPluginProfileIds, profileId]);
+    errorMessage = "";
+    try {
+      await initializePluginConfigs(request);
+      if (selectedServerId !== profileId) return;
+      await openPluginConfig(plugin, spec);
+      if (!pluginConfigExists) {
+        errorMessage = `${plugin.name} 已完成短时加载，但没有生成 ${spec.path}；该插件可能只会在连接后生成配置。`;
+      }
+    } catch (error) {
+      errorMessage = String(error);
+    } finally {
+      const next = new Set(initializingPluginProfileIds);
+      next.delete(profileId);
+      initializingPluginProfileIds = next;
+    }
+  }
+
   function openOfficialLink(event: MouseEvent, url: string) {
     event.stopPropagation();
     void openPluginLink(url).catch((error) => (errorMessage = String(error)));
@@ -577,7 +610,7 @@
                 {#each metaPlugins as plugin}
                   <div class="plugin-library-card">
                     <span class="plugin-library-mark">M</span>
-                    <span class="plugin-library-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}</small></span>
+                    <span class="plugin-library-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}{#if plugin.dependencies.length} · 依赖 {plugin.dependencies.join("、")}{/if}</small></span>
                     <em>已下载</em>
                   </div>
                 {:else}
@@ -591,7 +624,7 @@
                 {#each ordinaryPlugins as plugin}
                   <div class="plugin-library-card">
                     <span class="plugin-library-mark ordinary">P</span>
-                    <span class="plugin-library-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}</small></span>
+                    <span class="plugin-library-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}{#if plugin.dependencies.length} · 依赖 {plugin.dependencies.join("、")}{/if}</small></span>
                     <em>已下载</em>
                   </div>
                 {:else}
@@ -745,7 +778,7 @@
                     {#each ordinaryPlugins as plugin}
                       <div class="plugin-card-row">
                         <button type="button" class:selected={form.enabledPluginIds.includes(plugin.id)} class="plugin-card" onclick={() => togglePlugin(plugin.id)}>
-                          <span class="plugin-check">{form.enabledPluginIds.includes(plugin.id) ? "✓" : ""}</span><span class="plugin-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}</small></span>
+                          <span class="plugin-check">{form.enabledPluginIds.includes(plugin.id) ? "✓" : ""}</span><span class="plugin-copy"><strong>{plugin.name}<i>{plugin.version}</i></strong><small>{plugin.description}{#if plugin.dependencies.length} · 依赖 {plugin.dependencies.join("、")}（自动加载）{/if}</small></span>
                         </button>
                         {#if plugin.configFiles.length}
                           <button type="button" class="plugin-config-button" onclick={() => void openPluginConfig(plugin)}>{plugin.configFiles.length > 1 ? "配置…" : "配置"}</button>
@@ -765,13 +798,17 @@
                       <textarea
                         value={pluginConfigContent}
                         oninput={(event) => { pluginConfigContent = (event.currentTarget as HTMLTextAreaElement).value; pluginConfigDirty = true; }}
-                        disabled={!pluginConfigExists || loadingPluginConfig || savingPluginConfig}
+                        disabled={!pluginConfigExists || loadingPluginConfig || savingPluginConfig || selectedInitializing}
                         spellcheck="false"
                         aria-label={`${pluginConfigPlugin.name} 配置内容`}
                       ></textarea>
                       <div class="plugin-config-editor-footer">
-                        <span>{loadingPluginConfig ? "正在读取…" : !pluginConfigExists ? "尚未生成；请先启动一次服务器，再点击配置重新读取" : pluginConfigDirty ? "有未保存的修改" : "使用插件原生配置路径"}</span>
-                        <button type="button" class="plugin-config-save" disabled={!pluginConfigExists || loadingPluginConfig || savingPluginConfig || !pluginConfigDirty} onclick={() => void savePluginConfig()}>{savingPluginConfig ? "保存中…" : "保存配置"}</button>
+                        <span>{selectedInitializing ? "正在短时加载插件；不会连接服务器…" : loadingPluginConfig ? "正在读取…" : !pluginConfigExists ? "尚未生成；可以短时加载插件来创建默认配置" : pluginConfigDirty ? "有未保存的修改" : "使用插件原生配置路径"}</span>
+                        {#if pluginConfigExists}
+                          <button type="button" class="plugin-config-save" disabled={selectedInitializing || loadingPluginConfig || savingPluginConfig || !pluginConfigDirty} onclick={() => void savePluginConfig()}>{savingPluginConfig ? "保存中…" : "保存配置"}</button>
+                        {:else}
+                          <button type="button" class="plugin-config-save" disabled={selectedInitializing || loadingPluginConfig} onclick={() => void generatePluginConfig()}>{selectedInitializing ? "正在生成…" : "生成默认配置"}</button>
+                        {/if}
                       </div>
                     </div>
                   {/if}
@@ -781,7 +818,7 @@
           </div>
         {/if}
         <div class="launch-zone">
-          <div><span>当前服务器实例</span><strong>{selectedRunning ? `${form.serverName} 正在运行` : selectedLaunching ? `${form.serverName} 正在启动` : "配置完成后启动"}</strong><small>{selectedMeta?.name ?? "请选择 Meta"} · {enabledPluginCount} 个普通插件</small></div>
+          <div><span>当前服务器实例</span><strong>{selectedRunning ? `${form.serverName} 正在运行` : selectedLaunching ? `${form.serverName} 正在启动` : selectedInitializing ? `${form.serverName} 正在初始化插件` : "配置完成后启动"}</strong><small>{selectedMeta?.name ?? "请选择 Meta"} · {enabledPluginCount} 个普通插件</small></div>
           {#if selectedRunning}<button class="danger-button" onclick={stopCurrent}><svg viewBox="0 0 24 24">{@html icon("stop")}</svg>停止</button>{:else}<button class="primary-button" disabled={!canLaunch} onclick={startBot}><svg viewBox="0 0 24 24">{@html icon("play")}</svg>{selectedLaunching ? "启动中…" : "启动"}</button>{/if}
         </div>
       </article>
@@ -797,6 +834,6 @@
     </section>
 
     {/if}
-    <footer class="workspace-footer"><span>数据目录 · {status?.dataDir ?? "正在定位…"}</span><span>xinbot-gui-win 0.2.5</span></footer>
+    <footer class="workspace-footer"><span>数据目录 · {status?.dataDir ?? "正在定位…"}</span><span>xinbot-gui-win 0.2.6</span></footer>
   </main>
 </div>

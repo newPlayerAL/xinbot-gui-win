@@ -1,12 +1,12 @@
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
     process::{Child, ChildStdin, Command, Stdio},
     sync::{Arc, Mutex},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use serde::{Deserialize, Serialize};
@@ -240,27 +240,8 @@ pub fn launch_bot(
     let java_jar = java_compatible_path(&paths.xinbot_jar);
     let java_config = java_compatible_path(&config);
 
-    let mut command = Command::new(&java);
+    let mut command = core_command(&java, &java_jar, &working_dir, &request);
     command
-        .current_dir(&working_dir)
-        .arg("-Dorg.jline.terminal.dumb=true")
-        .arg("-Dfile.encoding=UTF-8");
-    if request.meta_plugin_id == "directconnect" {
-        command.arg(format!("-Dxinbot.server.host={}", request.host));
-        if let Some(port) = request.port {
-            command.arg(format!("-Dxinbot.server.port={port}"));
-        }
-        if !request.online_mode && !request.login_template.trim().is_empty() {
-            command.arg(format!(
-                "-Dxinbot.login.template={}",
-                request.login_template.trim()
-            ));
-        }
-    }
-    command
-        .arg("-cp")
-        .arg(&java_jar)
-        .arg("xin.bbtt.mcbot.Xinbot")
         .arg(&java_config)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -347,6 +328,131 @@ pub fn launch_bot(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn initialize_plugin_configs(
+    app: AppHandle,
+    request: LaunchRequest,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || initialize_plugin_configs_blocking(app, request))
+        .await
+        .map_err(|error| format!("插件初始化任务异常结束：{error}"))?
+}
+
+fn initialize_plugin_configs_blocking(
+    app: AppHandle,
+    request: LaunchRequest,
+) -> Result<(), String> {
+    validate_request(&request)?;
+    let profile_id = profile_id_for_request(&request);
+    let state = app.state::<ProcessState>();
+    let _reservation = state.reserve_start(&profile_id)?;
+    let paths = AppPaths::resolve(&app)?;
+    let java = java_compatible_path(&paths.java_exe());
+    if !java.is_file() {
+        return Err("请先安装 Java 21 运行环境".to_string());
+    }
+    if !paths.xinbot_jar.is_file() {
+        return Err(format!(
+            "没有找到 xinbot.jar：{}",
+            paths.xinbot_jar.display()
+        ));
+    }
+    validate_core_jar(&paths.xinbot_jar)?;
+    validate_plugin_initializer(&paths.xinbot_jar)?;
+
+    let id = instance_id(&request.host, &request.username, &profile_id);
+    let working_dir = paths.data_dir.join("instances").join(&id);
+    let plugins_dir = working_dir.join("plugins");
+    fs::create_dir_all(&plugins_dir).map_err(|error| format!("无法创建实例目录：{error}"))?;
+    let selected_plugins = sync_server_plugins(
+        &app,
+        &plugins_dir,
+        &request.meta_plugin_id,
+        &request.enabled_plugin_ids,
+    )?;
+    let config = working_dir.join("config.conf");
+    write_config(&config, &request)?;
+
+    let java_jar = java_compatible_path(&paths.xinbot_jar);
+    let java_config = java_compatible_path(&config);
+    let mut command = core_command(&java, &java_jar, &working_dir, &request);
+    command
+        .arg("--init-plugins")
+        .arg(&java_config)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("无法启动插件初始化：{error}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "无法读取插件初始化输出".to_string())?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| "无法读取插件初始化错误输出".to_string())?;
+    pump_output(app.clone(), stdout, "stdout", profile_id.clone());
+    pump_output(app.clone(), stderr, "stderr", profile_id.clone());
+
+    let _ = app.emit(
+        "bot-console",
+        ConsoleEvent {
+            line: format!(
+                "[launcher] 正在初始化插件配置：{}",
+                selected_plugins
+                    .iter()
+                    .map(|plugin| plugin.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join("、")
+            ),
+            stream: "launcher",
+            profile_id: profile_id.clone(),
+        },
+    );
+
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => {
+                let _ = app.emit(
+                    "bot-console",
+                    ConsoleEvent {
+                        line: "[launcher] 插件配置初始化完成；没有连接服务器。".to_string(),
+                        stream: "launcher",
+                        profile_id,
+                    },
+                );
+                return Ok(());
+            }
+            Ok(Some(status)) => {
+                return Err(format!(
+                    "插件初始化失败{}",
+                    status
+                        .code()
+                        .map(|code| format!("（退出代码 {code}）"))
+                        .unwrap_or_default()
+                ));
+            }
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(100)),
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("插件初始化超过 20 秒，已安全结束进程".to_string());
+            }
+            Err(error) => return Err(format!("无法确认插件初始化状态：{error}")),
+        }
+    }
+}
+
 fn validate_core_jar(path: &Path) -> Result<(), String> {
     let file = fs::File::open(path).map_err(|error| format!("无法读取 XinBot Core：{error}"))?;
     let mut archive =
@@ -355,6 +461,24 @@ fn validate_core_jar(path: &Path) -> Result<(), String> {
         .by_name("xin/bbtt/mcbot/Xinbot.class")
         .map_err(|_| "XinBot Core 缺少主类 xin.bbtt.mcbot.Xinbot".to_string())?;
     Ok(())
+}
+
+fn validate_plugin_initializer(path: &Path) -> Result<(), String> {
+    let file = fs::File::open(path).map_err(|error| format!("无法读取 XinBot Core：{error}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|error| format!("XinBot Core 压缩包无效：{error}"))?;
+    let mut main_class = archive
+        .by_name("xin/bbtt/mcbot/Xinbot.class")
+        .map_err(|_| "XinBot Core 缺少主类 xin.bbtt.mcbot.Xinbot".to_string())?;
+    let mut bytes = Vec::new();
+    main_class
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("无法检查 XinBot Core 功能：{error}"))?;
+    bytes
+        .windows(b"--init-plugins".len())
+        .any(|window| window == b"--init-plugins")
+        .then_some(())
+        .ok_or_else(|| "当前 XinBot Core 不支持短时初始化插件，请更新 Core".to_string())
 }
 
 fn java_compatible_path(path: &Path) -> PathBuf {
@@ -369,6 +493,36 @@ fn java_compatible_path(path: &Path) -> PathBuf {
         }
     }
     path.to_path_buf()
+}
+
+fn core_command(
+    java: &Path,
+    java_jar: &Path,
+    working_dir: &Path,
+    request: &LaunchRequest,
+) -> Command {
+    let mut command = Command::new(java);
+    command
+        .current_dir(working_dir)
+        .arg("-Dorg.jline.terminal.dumb=true")
+        .arg("-Dfile.encoding=UTF-8");
+    if request.meta_plugin_id == "directconnect" {
+        command.arg(format!("-Dxinbot.server.host={}", request.host));
+        if let Some(port) = request.port {
+            command.arg(format!("-Dxinbot.server.port={port}"));
+        }
+        if !request.online_mode && !request.login_template.trim().is_empty() {
+            command.arg(format!(
+                "-Dxinbot.login.template={}",
+                request.login_template.trim()
+            ));
+        }
+    }
+    command
+        .arg("-cp")
+        .arg(java_jar)
+        .arg("xin.bbtt.mcbot.Xinbot");
+    command
 }
 
 #[tauri::command]
