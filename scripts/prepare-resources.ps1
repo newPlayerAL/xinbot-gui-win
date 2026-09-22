@@ -54,9 +54,20 @@ try {
             "org/fusesource/jansi/internal/native/Windows/x86_64/",
             [System.StringComparison]::Ordinal
         )
+        $isJlineNative = $name.StartsWith(
+            "org/jline/nativ/",
+            [System.StringComparison]::Ordinal
+        ) -and ($name.EndsWith(".dll", [System.StringComparison]::OrdinalIgnoreCase) -or
+            $name.EndsWith(".so", [System.StringComparison]::OrdinalIgnoreCase) -or
+            $name.EndsWith(".jnilib", [System.StringComparison]::OrdinalIgnoreCase))
+        $isWindowsJline = $name.StartsWith(
+            "org/jline/nativ/Windows/x86_64/",
+            [System.StringComparison]::Ordinal
+        )
 
         ($isNettyNative -and -not $isWindowsNetty) -or
-            ($isJansiNative -and -not $isWindowsJansi)
+            ($isJansiNative -and -not $isWindowsJansi) -or
+            ($isJlineNative -and -not $isWindowsJline)
     })
 
     foreach ($entry in $entriesToRemove) {
