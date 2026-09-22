@@ -834,6 +834,6 @@
     </section>
 
     {/if}
-    <footer class="workspace-footer"><span>数据目录 · {status?.dataDir ?? "正在定位…"}</span><span>xinbot-gui-win 0.2.6</span></footer>
+    <footer class="workspace-footer"><span>数据目录 · {status?.dataDir ?? "正在定位…"}</span><span>xinbot-gui-win 0.2.7</span></footer>
   </main>
 </div>

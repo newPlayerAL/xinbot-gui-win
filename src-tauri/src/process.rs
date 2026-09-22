@@ -467,18 +467,25 @@ fn validate_plugin_initializer(path: &Path) -> Result<(), String> {
     let file = fs::File::open(path).map_err(|error| format!("无法读取 XinBot Core：{error}"))?;
     let mut archive =
         zip::ZipArchive::new(file).map_err(|error| format!("XinBot Core 压缩包无效：{error}"))?;
-    let mut main_class = archive
-        .by_name("xin/bbtt/mcbot/Xinbot.class")
-        .map_err(|_| "XinBot Core 缺少主类 xin.bbtt.mcbot.Xinbot".to_string())?;
-    let mut bytes = Vec::new();
-    main_class
-        .read_to_end(&mut bytes)
-        .map_err(|error| format!("无法检查 XinBot Core 功能：{error}"))?;
-    bytes
-        .windows(b"--init-plugins".len())
-        .any(|window| window == b"--init-plugins")
-        .then_some(())
-        .ok_or_else(|| "当前 XinBot Core 不支持短时初始化插件，请更新 Core".to_string())
+    for class_name in [
+        "xin/bbtt/mcbot/Xinbot.class",
+        "xin/bbtt/mcbot/cli/Cli.class",
+    ] {
+        let Ok(mut class_file) = archive.by_name(class_name) else {
+            continue;
+        };
+        let mut bytes = Vec::new();
+        class_file
+            .read_to_end(&mut bytes)
+            .map_err(|error| format!("无法检查 XinBot Core 功能：{error}"))?;
+        if bytes
+            .windows(b"--init-plugins".len())
+            .any(|window| window == b"--init-plugins")
+        {
+            return Ok(());
+        }
+    }
+    Err("当前 XinBot Core 不支持短时初始化插件，请更新 Core".to_string())
 }
 
 fn java_compatible_path(path: &Path) -> PathBuf {

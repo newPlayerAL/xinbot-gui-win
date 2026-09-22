@@ -4948,7 +4948,7 @@ dependencies = [
 
 [[package]]
 name = "xinbot-gui-win"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "encoding_rs",
  "futures-util",
