@@ -2,6 +2,14 @@
   "name": "xinbot-gui-win",
   "private": true,
   "version": "0.2.8",
+  "description": "Windows control center for running and managing multiple XinBot instances",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/newPlayerAL/xinbot-gui-win.git"
+  },
+  "bugs": "https://github.com/newPlayerAL/xinbot-gui-win/issues",
+  "homepage": "https://github.com/newPlayerAL/xinbot-gui-win#readme",
   "type": "module",
   "scripts": {
     "dev": "vite",

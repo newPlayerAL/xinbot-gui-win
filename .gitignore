@@ -1,6 +1,7 @@
 node_modules/
 dist/
 src-tauri/target/
+bundled-plugins/*/target/
 src-tauri/resources/*.jar
 artifacts/*.exe
 rdp-screenshot-*.png

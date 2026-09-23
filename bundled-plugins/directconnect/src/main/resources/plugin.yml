@@ -1,0 +1,4 @@
+name: DirectConnect
+main: io.github.newplayeral.xinbotgui.directconnect.DirectConnectMetaPlugin
+version: 1.0.0
+type: META_PLUGIN

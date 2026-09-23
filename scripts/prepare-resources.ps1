@@ -1,20 +1,23 @@
 param(
-    [string]$SourceDirectory = (Join-Path $PSScriptRoot "../../xinbot-gui/dist/xinbot-gui"),
+    [string]$XinbotJar = (Join-Path $PSScriptRoot "../../xinbot/target/xinbot-2.4.3-RELEASE-windows-x86_64.jar"),
+    [string]$DirectConnectJar = (Join-Path $PSScriptRoot "../bundled-plugins/directconnect/target/directconnect.jar"),
     [string]$ChatFilterJar = (Join-Path $PSScriptRoot "../../ChatFilter/target/ChatFilter-1.0.0-RELEASE.jar")
 )
 
 $ErrorActionPreference = "Stop"
 $resourceDirectory = Join-Path $PSScriptRoot "../src-tauri/resources"
-$sourceJar = Join-Path $SourceDirectory "xinbot.jar"
 $destinationJar = Join-Path $resourceDirectory "xinbot.jar"
 
-if (-not (Test-Path -LiteralPath $sourceJar -PathType Leaf)) {
-    throw "xinbot.jar was not found at $sourceJar"
+if (-not (Test-Path -LiteralPath $XinbotJar -PathType Leaf)) {
+    throw "XinBot Core was not found at $XinbotJar"
+}
+if (-not (Test-Path -LiteralPath $DirectConnectJar -PathType Leaf)) {
+    throw "DirectConnect plugin was not found at $DirectConnectJar"
 }
 
 New-Item -ItemType Directory -Force -Path $resourceDirectory | Out-Null
-Copy-Item -LiteralPath $sourceJar -Destination $destinationJar -Force
-Copy-Item -LiteralPath (Join-Path $SourceDirectory "directconnect.jar") -Destination $resourceDirectory -Force
+Copy-Item -LiteralPath $XinbotJar -Destination $destinationJar -Force
+Copy-Item -LiteralPath $DirectConnectJar -Destination (Join-Path $resourceDirectory "directconnect.jar") -Force
 
 if (-not (Test-Path -LiteralPath $ChatFilterJar -PathType Leaf)) {
     throw "ChatFilter plugin was not found at $ChatFilterJar"

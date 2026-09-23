@@ -1,53 +1,46 @@
-# xinbot-gui-win
+# XinBot Windows
 
-Windows-only XinBot control center built with Tauri 2, Rust and Svelte. It intentionally does not
-bundle a JRE: on first launch it downloads a private Java 21 runtime into the application's local
-data directory, verifies the official SHA-256 checksum, and keeps that runtime isolated from the
-system `PATH`.
+A Windows-only control center for [XinBot](https://github.com/huangdihd/xinbot), built with
+Tauri 2, Rust and Svelte.
 
-This is a new implementation. It neither reads nor writes the legacy `%APPDATA%/xinbot-gui` data.
+[简体中文](README.zh-CN.md) · [Download the latest release](https://github.com/newPlayerAL/xinbot-gui-win/releases/latest)
 
-## Prototype scope
+## Features
 
-- Modern frameless Windows UI with persistent server profiles and dark/light themes.
-- Multiple server profiles can run at the same time; each XinBot process has its own working
-  directory, configuration, plugin set, console stream and command input.
-- A server-scoped workspace whose configuration can collapse to a compact summary, leaving most
-  of the window to the live console.
-- Per-server plugin selection: exactly one Meta plugin plus any number of ordinary plugins.
-- `2b2t.xin` and the official XinMetaPlugin are the default; DirectConnect remains available for
-  generic servers, and additional XinBot plugin JARs can be imported into the local plugin library.
-- Private Java 21 detection and installation.
-- Azul Zulu JRE as the small CDN-backed default, with Eclipse Temurin and Microsoft OpenJDK as
-  automatic fallbacks.
-- Resumable runtime downloads, SHA-256 verification and archive path validation.
-- XinBot launch through redirected stdin/stdout/stderr, command input and graceful `stop`.
-- Existing `xinbot.jar` and `directconnect.jar` are bundled as release resources without changing
-  the Java GUI project.
+- Run multiple server profiles concurrently. Every profile has its own XinBot process, working
+  directory, configuration, plugin set, console output and command input.
+- Edit or start another profile while bots are running; one instance does not block the others.
+- Manage Meta plugins separately from ordinary plugins, import local plugin JARs, and browse the
+  official plugin catalog.
+- Configure plugins per server. Known native configuration files can be edited in the app, and
+  plugins can be loaded briefly to generate their default configuration without connecting to a
+  Minecraft server.
+- Download a private Java 21 runtime on first launch. The runtime is checksum-verified and isolated
+  from the system `PATH`; Azul Zulu is preferred, with Eclipse Temurin and Microsoft OpenJDK as
+  fallbacks.
+- Bundle a Windows x86-64 optimized XinBot Core while keeping the normal Core build cross-platform.
 
-## Development
+## Install
 
-```bash
-npm install
-npm run dev          # browser UI preview (native actions are disabled)
-npm run tauri dev    # full desktop app; requires Tauri's platform prerequisites
+1. Open the [latest GitHub release](https://github.com/newPlayerAL/xinbot-gui-win/releases/latest).
+2. Download `XinBot_0.2.8_x64-setup.exe`.
+3. Verify its SHA-256 checksum against `SHA256SUMS.txt`, then run the installer.
+
+Requirements:
+
+- Windows 10 or Windows 11, x86-64.
+- Internet access on first launch to download Java 21.
+- The installer is not code-signed yet, so Windows SmartScreen may show an unknown-publisher
+  warning. Verify the checksum before continuing.
+
+Upgrades preserve application data under:
+
+```text
+%LOCALAPPDATA%/io.github.newplayeral.xinbot-gui-win/
 ```
 
-Build the NSIS installer on Windows:
-
-```powershell
-./scripts/prepare-resources.ps1
-npm ci
-npm run tauri build
-```
-
-`prepare-resources.ps1` copies the current XinBot artifacts and removes native libraries for
-Linux, macOS and non-x64 Windows targets from the bundled JAR. It does not modify the original
-cross-platform `xinbot.jar`. The resulting installer therefore targets Windows x64 only.
-
-The release profile enables LTO, size optimization, panic aborts and symbol stripping. The NSIS
-installer embeds only the small WebView2 bootstrapper; the Java runtime is always downloaded after
-the GUI starts.
+Server profiles may contain a secondary-login password. It is stored locally in the WebView
+profile and is not encrypted; do not use a valuable password there.
 
 ## Data layout
 
@@ -59,4 +52,50 @@ the GUI starts.
   instances/<stable-id>/    generated config, plugins and logs
 ```
 
-License: GPL-3.0-or-later.
+This application uses its own data layout and does not import the legacy Java GUI configuration.
+
+## Development
+
+Frontend preview:
+
+```bash
+npm ci
+npm run dev
+```
+
+A complete Windows build also needs Rust with the MSVC target, the Tauri 2 Windows prerequisites,
+Java 17+ and Maven. Build the companion projects first and place them next to this repository:
+
+```text
+workspace/
+  xinbot/          newPlayerAL/xinbot, tag xinbot-gui-win-v0.2.8-core
+  ChatFilter/
+  xinbot-gui-win/
+```
+
+Then run on Windows:
+
+```powershell
+cd ../xinbot
+mvn -Pwindows-x86_64 clean install
+
+cd ../ChatFilter
+mvn package
+
+cd ../xinbot-gui-win
+mvn -f bundled-plugins/directconnect/pom.xml package
+./scripts/prepare-resources.ps1
+npm ci
+npm run tauri -- build --target x86_64-pc-windows-msvc
+```
+
+`prepare-resources.ps1` copies the built companion JARs and keeps only Windows x86-64 native
+libraries in the bundled Core. The source Core's normal `mvn package` output is not modified.
+
+## Source and licenses
+
+This project is licensed under `GPL-3.0-or-later`; see [LICENSE](LICENSE). Sources and licenses for
+the bundled Core and plugins are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+XinBot and Minecraft are separate projects. This application is not affiliated with or endorsed by
+Mojang Studios or Microsoft.

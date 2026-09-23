@@ -31,7 +31,10 @@
     "active": true,
     "targets": ["nsis"],
     "useLocalToolsDir": true,
+    "license": "GPL-3.0-or-later",
+    "licenseFile": "../LICENSE",
     "resources": {
+      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
       "resources/xinbot.jar": "resources/xinbot.jar",
       "resources/directconnect.jar": "resources/directconnect.jar",
       "resources/xinmetaplugin.jar": "resources/xinmetaplugin.jar",
