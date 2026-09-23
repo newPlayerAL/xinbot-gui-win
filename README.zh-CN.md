@@ -5,6 +5,10 @@ Tauri 2、Rust 和 Svelte 开发。
 
 [English](README.md) · [下载最新版本](https://github.com/newPlayerAL/xinbot-gui-win/releases/latest)
 
+![XinBot Windows 控制中心](docs/xinbot-ui.png)
+
+_截图使用本地预览数据，不包含真实账号或服务器凭据。_
+
 ## 功能
 
 - 同时运行多个服务器配置。每个配置都有独立的 XinBot 进程、工作目录、配置、插件、控制台

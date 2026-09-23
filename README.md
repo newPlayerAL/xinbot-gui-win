@@ -5,6 +5,10 @@ Tauri 2, Rust and Svelte.
 
 [简体中文](README.zh-CN.md) · [Download the latest release](https://github.com/newPlayerAL/xinbot-gui-win/releases/latest)
 
+![XinBot Windows control center](docs/xinbot-ui.png)
+
+_Shown with local preview data; no real account or server credentials are included._
+
 ## Features
 
 - Run multiple server profiles concurrently. Every profile has its own XinBot process, working
