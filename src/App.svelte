@@ -201,6 +201,11 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(servers));
   }
 
+  function confirmDiscardPluginConfig(): boolean {
+    return !pluginConfigDirty
+      || window.confirm("当前插件配置还有未保存的修改，确定放弃修改吗？");
+  }
+
   function showSaved() {
     saveNotice = "已保存";
     if (saveTimer) window.clearTimeout(saveTimer);
@@ -229,6 +234,7 @@
   function selectProfile(id: string, saveBeforeSwitch = true) {
     activeView = "servers";
     if (id === selectedServerId && saveBeforeSwitch) return;
+    if (!confirmDiscardPluginConfig()) return;
     if (saveBeforeSwitch && isDirty) saveCurrent(false);
     const profile = servers.find((server) => server.id === id);
     if (!profile) return;
@@ -247,6 +253,8 @@
   }
 
   function addServer() {
+    if (!confirmDiscardPluginConfig()) return;
+    pluginConfigDirty = false;
     if (isDirty) saveCurrent(false);
     const profile = createServer(servers.length + 1);
     servers = [...servers, profile];
@@ -257,7 +265,9 @@
 
   function deleteServer() {
     if (selectedBusy || servers.length === 1) return;
-    if (!window.confirm(`删除“${form.serverName || "未命名服务器"}”及其界面配置？`)) return;
+    const unsavedWarning = pluginConfigDirty ? "\n当前插件配置中未保存的修改也会丢失。" : "";
+    if (!window.confirm(`删除“${form.serverName || "未命名服务器"}”及其界面配置？${unsavedWarning}`)) return;
+    pluginConfigDirty = false;
     const index = servers.findIndex((server) => server.id === selectedServerId);
     const nextServers = servers.filter((server) => server.id !== selectedServerId);
     servers = nextServers;
@@ -532,6 +542,7 @@
 </script>
 
 <svelte:head><title>XinBot · Windows 控制台</title></svelte:head>
+<svelte:window oncontextmenu={(event) => event.preventDefault()} />
 
 <div class:light={theme === "light"} class="app-shell">
   <header class="titlebar" data-tauri-drag-region>

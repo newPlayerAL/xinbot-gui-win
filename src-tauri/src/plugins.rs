@@ -289,8 +289,10 @@ pub fn open_plugin_link(url: String) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
-        Command::new("cmd")
-            .args(["/C", "start", "", &url])
+        // Invoke Explorer directly so URL characters are never interpreted by
+        // cmd.exe as shell operators.
+        Command::new("explorer.exe")
+            .arg(&url)
             .spawn()
             .map_err(|error| format!("无法打开链接：{error}"))?;
     }
@@ -312,11 +314,49 @@ pub fn open_plugin_link(url: String) -> Result<(), String> {
 }
 
 fn is_allowed_plugin_link(url: &str) -> bool {
-    (url.starts_with("https://xinbot.shouldbe.top/") || url.starts_with("https://github.com/"))
-        && url.len() <= 2048
-        && !url
-            .chars()
-            .any(|character| character.is_whitespace() || character.is_control())
+    if url.len() > 2048 {
+        return false;
+    }
+    let Ok(parsed) = reqwest::Url::parse(url) else {
+        return false;
+    };
+    parsed.scheme() == "https"
+        && parsed.username().is_empty()
+        && parsed.password().is_none()
+        && parsed.port_or_known_default() == Some(443)
+        && matches!(
+            parsed.host_str(),
+            Some("github.com") | Some("xinbot.shouldbe.top")
+        )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_allowed_plugin_link;
+
+    #[test]
+    fn allows_expected_plugin_links() {
+        assert!(is_allowed_plugin_link(
+            "https://github.com/huangdihd/XinMetaPlugin/releases"
+        ));
+        assert!(is_allowed_plugin_link(
+            "https://xinbot.shouldbe.top/zh/guide/plugin-list"
+        ));
+    }
+
+    #[test]
+    fn rejects_lookalike_or_unsafe_plugin_links() {
+        assert!(!is_allowed_plugin_link(
+            "http://github.com/huangdihd/xinbot"
+        ));
+        assert!(!is_allowed_plugin_link(
+            "https://github.com.evil.example/huangdihd/xinbot"
+        ));
+        assert!(!is_allowed_plugin_link(
+            "https://github.com@evil.example/huangdihd/xinbot"
+        ));
+        assert!(!is_allowed_plugin_link("https://github.com:444/xinbot"));
+    }
 }
 
 #[tauri::command]
