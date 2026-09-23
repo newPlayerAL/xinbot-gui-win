@@ -15,11 +15,12 @@ First public Windows release.
 - Irrelevant WebView context menus are disabled and plugin links use validated native URL opening.
 - XinBot Core 2.4.3 integration with a Windows x86-64 slim distribution.
 - Private Java 21 download with checksum verification and provider fallback.
-- 20.36 MiB NSIS installer; existing application data is preserved during upgrades.
+- 21.28 MiB NSIS installer; existing application data is preserved during upgrades.
 
 ### Verification
 
 - XinBot Core: 89 tests passed.
+- Windows GUI Rust tests: 2 tests passed.
 - Windows x86-64 release and NSIS builds passed.
-- XinMetaPlugin and ChatFilter initialization passed.
+- XinMetaPlugin, ChatFilter, MovementSync and BackToTheBase initialization passed.
 - Real server connection and multi-instance operation were tested on Windows 10 x64.
