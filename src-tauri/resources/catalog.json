@@ -31,5 +31,35 @@
     "loginMode": "none",
     "hostPatterns": [],
     "recommended": false
+  },
+  {
+    "id": "movementsync",
+    "name": "MovementSync",
+    "version": "1.6.0-RELEASE",
+    "pluginType": "PLUGIN",
+    "description": "为移动、寻路和方块交互提供基础能力",
+    "resource": "movementsync.jar",
+    "loginMode": "none",
+    "hostPatterns": [],
+    "recommended": false
+  },
+  {
+    "id": "backtothebase",
+    "name": "BackToTheBase",
+    "version": "1.8.0-RELEASE",
+    "pluginType": "PLUGIN",
+    "description": "按玩家和编号触发基地珍珠按钮",
+    "resource": "backtothebase.jar",
+    "loginMode": "none",
+    "hostPatterns": [],
+    "recommended": false,
+    "dependencies": ["MovementSync"],
+    "configFiles": [
+      {
+        "path": "base_config.json",
+        "format": "json",
+        "label": "BackToTheBase 配置"
+      }
+    ]
   }
 ]

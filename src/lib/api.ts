@@ -13,6 +13,7 @@ import type {
   RuntimeSource,
 } from "./types";
 import { officialPluginCatalog } from "./officialPlugins";
+import { createDefaultBttbConfig, serializeBttbConfig } from "./bttbConfig";
 
 export const inTauri = () => Boolean(window.__TAURI_INTERNALS__);
 
@@ -64,6 +65,8 @@ export async function listAvailablePlugins(): Promise<PluginDescriptor[]> {
       { id: "xinmeta", name: "XinMetaPlugin", version: "1.1.0-RELEASE", pluginType: "META_PLUGIN", description: "2b2t.xin 官方适配", source: "bundled", resource: "xinmetaplugin.jar", loginMode: "plugin", hostPatterns: ["2b2t.xin"], recommended: true, dependencies: [], configFiles: [] },
       { id: "directconnect", name: "DirectConnect", version: "1.0.0-RELEASE", pluginType: "META_PLUGIN", description: "通用服务器直连适配", source: "bundled", resource: "directconnect.jar", loginMode: "template", hostPatterns: [], recommended: false, dependencies: [], configFiles: [] },
       { id: "chatfilter", name: "ChatFilter", version: "1.0.0-RELEASE", pluginType: "PLUGIN", description: "聊天消息过滤插件", source: "bundled", resource: "chatfilter.jar", loginMode: "none", hostPatterns: [], recommended: false, dependencies: [], configFiles: [] },
+      { id: "movementsync", name: "MovementSync", version: "1.6.0-RELEASE", pluginType: "PLUGIN", description: "为移动、寻路和方块交互提供基础能力", source: "bundled", resource: "movementsync.jar", loginMode: "none", hostPatterns: [], recommended: false, dependencies: [], configFiles: [] },
+      { id: "backtothebase", name: "BackToTheBase", version: "1.8.0-RELEASE", pluginType: "PLUGIN", description: "按玩家和编号触发基地珍珠按钮", source: "bundled", resource: "backtothebase.jar", loginMode: "none", hostPatterns: [], recommended: false, dependencies: ["MovementSync"], configFiles: [{ path: "base_config.json", format: "json", label: "BackToTheBase 配置" }] },
     ];
   }
   return invoke<PluginDescriptor[]>("list_available_plugins");
@@ -89,12 +92,13 @@ export async function importPlugin(path: string): Promise<PluginDescriptor> {
 
 export async function readPluginConfig(request: PluginConfigRequest): Promise<PluginConfigDocument> {
   if (!inTauri()) {
+    const isBttb = request.pluginId === "backtothebase" && request.path === "base_config.json";
     return {
       pluginId: request.pluginId,
       path: request.path,
       format: "json",
-      exists: false,
-      content: "",
+      exists: isBttb,
+      content: isBttb ? serializeBttbConfig(createDefaultBttbConfig()) : "",
     };
   }
   return invoke<PluginConfigDocument>("read_plugin_config", { request });

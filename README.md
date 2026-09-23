@@ -15,6 +15,8 @@ Tauri 2, Rust and Svelte.
 - Configure plugins per server. Known native configuration files can be edited in the app, and
   plugins can be loaded briefly to generate their default configuration without connecting to a
   Minecraft server.
+- Use the bundled BackToTheBase plugin without a separate download. Its player locations, return
+  point, administrators and language have a dedicated visual editor with a raw JSON fallback.
 - Download a private Java 21 runtime on first launch. The runtime is checksum-verified and isolated
   from the system `PATH`; Azul Zulu is preferred, with Eclipse Temurin and Microsoft OpenJDK as
   fallbacks.
@@ -89,7 +91,8 @@ npm ci
 npm run tauri -- build --target x86_64-pc-windows-msvc
 ```
 
-`prepare-resources.ps1` copies the built companion JARs and keeps only Windows x86-64 native
+`prepare-resources.ps1` copies the built companion JARs, downloads checksum-pinned BackToTheBase
+and MovementSync inputs, assembles a slim MovementSync JAR, and keeps only Windows x86-64 native
 libraries in the bundled Core. The source Core's normal `mvn package` output is not modified.
 
 ## Source and licenses

@@ -39,6 +39,8 @@
       "resources/directconnect.jar": "resources/directconnect.jar",
       "resources/xinmetaplugin.jar": "resources/xinmetaplugin.jar",
       "resources/chatfilter.jar": "resources/chatfilter.jar",
+      "resources/movementsync.jar": "resources/movementsync.jar",
+      "resources/backtothebase.jar": "resources/backtothebase.jar",
       "resources/catalog.json": "resources/catalog.json",
       "resources/official_plugins.json": "resources/official_plugins.json"
     },

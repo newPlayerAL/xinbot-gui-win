@@ -1,1 +1,1 @@
-2a312cf6d2f80fdc42f32bf9a010b53862b79a671ac3c50cdefc17bae3909de8  XinBot_0.2.8_x64-setup.exe
+ff69e3b37b2837685b6334e9bcd16b0654289f56f160f8cf5a9b14e93d82cfd3  XinBot_0.2.8_x64-setup.exe

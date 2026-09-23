@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { open } from "@tauri-apps/plugin-dialog";
+  import BttbConfigEditor from "./BttbConfigEditor.svelte";
   import {
     getRuntimeSources,
     getOfficialPluginCatalog,
@@ -21,6 +22,12 @@
     openPluginLink,
     writePluginConfig,
   } from "./lib/api";
+  import {
+    parseBttbConfig,
+    serializeBttbConfig,
+    validateBttbConfig,
+    type BttbConfig,
+  } from "./lib/bttbConfig";
   import { officialPluginCatalog as previewOfficialPluginCatalog } from "./lib/officialPlugins";
   import type {
     AppStatus,
@@ -98,6 +105,9 @@
   let pluginConfigContent = "";
   let pluginConfigExists = false;
   let pluginConfigDirty = false;
+  let bttbConfig: BttbConfig | null = null;
+  let bttbConfigError = "";
+  let bttbRawMode = false;
   let loadingPluginConfig = false;
   let savingPluginConfig = false;
   let initializingPluginProfileIds = new Set<string>();
@@ -122,6 +132,11 @@
   $: metaPlugins = plugins.filter((plugin) => plugin.pluginType === "META_PLUGIN");
   $: ordinaryPlugins = plugins.filter((plugin) => plugin.pluginType === "PLUGIN");
   $: pluginConfigSpec = pluginConfigPlugin?.configFiles.find((file) => file.path === pluginConfigPath) ?? null;
+  $: isBttbConfig = pluginConfigPlugin?.name.toLowerCase() === "backtothebase"
+    && pluginConfigPath.toLowerCase() === "base_config.json";
+  $: bttbValidationError = isBttbConfig && !bttbRawMode && bttbConfig
+    ? validateBttbConfig(bttbConfig)
+    : "";
   $: filteredOfficialPlugins = officialCatalog.entries.filter((plugin) => {
     const query = officialPluginQuery.trim().toLowerCase();
     const matchesType = officialPluginTypeFilter === "all" || plugin.pluginType === officialPluginTypeFilter;
@@ -247,6 +262,7 @@
     pluginConfigContent = "";
     pluginConfigExists = false;
     pluginConfigDirty = false;
+    resetBttbEditor();
     configTab = "connection";
     configurationCollapsed = false;
     consoleLines = consoleBuffers[id] ?? [initialConsoleLine(id)];
@@ -332,6 +348,7 @@
     pluginConfigContent = "";
     pluginConfigExists = false;
     pluginConfigDirty = false;
+    resetBttbEditor();
     loadingPluginConfig = true;
     errorMessage = "";
     try {
@@ -344,6 +361,7 @@
       });
       pluginConfigExists = document.exists;
       pluginConfigContent = document.content;
+      if (document.exists && isBttbTarget(plugin, nextSpec)) loadBttbEditor(document.content);
     } catch (error) {
       errorMessage = String(error);
       pluginConfigContent = "";
@@ -354,6 +372,21 @@
 
   async function savePluginConfig() {
     if (!pluginConfigPlugin || !pluginConfigSpec || !pluginConfigExists || loadingPluginConfig) return;
+    if (isBttbConfig && !bttbRawMode && bttbConfig) {
+      const validationError = validateBttbConfig(bttbConfig);
+      if (validationError) {
+        errorMessage = `BackToTheBase 配置无效：${validationError}`;
+        return;
+      }
+      pluginConfigContent = serializeBttbConfig(bttbConfig);
+    } else if (isBttbConfig && bttbRawMode) {
+      try {
+        parseBttbConfig(pluginConfigContent);
+      } catch (error) {
+        errorMessage = `BackToTheBase 配置无效：${String(error instanceof Error ? error.message : error)}`;
+        return;
+      }
+    }
     if (pluginConfigSpec.format === "json") {
       try {
         JSON.parse(pluginConfigContent);
@@ -380,6 +413,45 @@
       errorMessage = String(error);
     } finally {
       savingPluginConfig = false;
+    }
+  }
+
+  function isBttbTarget(plugin: PluginDescriptor, spec: PluginConfigFile): boolean {
+    return plugin.name.toLowerCase() === "backtothebase" && spec.path.toLowerCase() === "base_config.json";
+  }
+
+  function resetBttbEditor() {
+    bttbConfig = null;
+    bttbConfigError = "";
+    bttbRawMode = false;
+  }
+
+  function loadBttbEditor(content: string) {
+    try {
+      bttbConfig = parseBttbConfig(content);
+      bttbConfigError = "";
+      bttbRawMode = false;
+    } catch (error) {
+      bttbConfig = null;
+      bttbConfigError = String(error instanceof Error ? error.message : error);
+      bttbRawMode = true;
+    }
+  }
+
+  function updateBttbConfig(next: BttbConfig) {
+    bttbConfig = next;
+    pluginConfigContent = serializeBttbConfig(next);
+    pluginConfigDirty = true;
+    bttbConfigError = "";
+  }
+
+  function showBttbVisualEditor() {
+    try {
+      bttbConfig = parseBttbConfig(pluginConfigContent);
+      bttbConfigError = "";
+      bttbRawMode = false;
+    } catch (error) {
+      bttbConfigError = String(error instanceof Error ? error.message : error);
     }
   }
 
@@ -804,19 +876,37 @@
                     <div class="plugin-config-editor">
                       <div class="plugin-config-editor-heading">
                         <div><strong>{pluginConfigSpec.label || pluginConfigPlugin.name}</strong><small>{pluginConfigPlugin.name} · {pluginConfigPath}</small></div>
-                        <span class:exists={pluginConfigExists}>{pluginConfigExists ? "已创建" : "待创建"}</span>
+                        <div class="plugin-config-editor-actions">
+                          {#if isBttbConfig && pluginConfigExists}
+                            {#if bttbRawMode}
+                              <button type="button" onclick={showBttbVisualEditor}>可视化编辑</button>
+                            {:else}
+                              <button type="button" onclick={() => (bttbRawMode = true)}>高级 JSON</button>
+                            {/if}
+                          {/if}
+                          <span class:exists={pluginConfigExists}>{pluginConfigExists ? "已创建" : "待创建"}</span>
+                        </div>
                       </div>
-                      <textarea
-                        value={pluginConfigContent}
-                        oninput={(event) => { pluginConfigContent = (event.currentTarget as HTMLTextAreaElement).value; pluginConfigDirty = true; }}
-                        disabled={!pluginConfigExists || loadingPluginConfig || savingPluginConfig || selectedInitializing}
-                        spellcheck="false"
-                        aria-label={`${pluginConfigPlugin.name} 配置内容`}
-                      ></textarea>
+                      {#if isBttbConfig && pluginConfigExists && !bttbRawMode && bttbConfig}
+                        <BttbConfigEditor
+                          config={bttbConfig}
+                          disabled={loadingPluginConfig || savingPluginConfig || selectedInitializing}
+                          onChange={updateBttbConfig}
+                        />
+                      {:else}
+                        {#if isBttbConfig && bttbConfigError}<p class="plugin-config-parse-error">无法显示可视化表单：{bttbConfigError}。可以在 JSON 模式中修复。</p>{/if}
+                        <textarea
+                          value={pluginConfigContent}
+                          oninput={(event) => { pluginConfigContent = (event.currentTarget as HTMLTextAreaElement).value; pluginConfigDirty = true; bttbConfigError = ""; }}
+                          disabled={!pluginConfigExists || loadingPluginConfig || savingPluginConfig || selectedInitializing}
+                          spellcheck="false"
+                          aria-label={`${pluginConfigPlugin.name} 配置内容`}
+                        ></textarea>
+                      {/if}
                       <div class="plugin-config-editor-footer">
-                        <span>{selectedInitializing ? "正在短时加载插件；不会连接服务器…" : loadingPluginConfig ? "正在读取…" : !pluginConfigExists ? "尚未生成；可以短时加载插件来创建默认配置" : pluginConfigDirty ? "有未保存的修改" : "使用插件原生配置路径"}</span>
+                        <span class:error={Boolean(bttbValidationError)}>{selectedInitializing ? "正在短时加载插件；不会连接服务器…" : loadingPluginConfig ? "正在读取…" : !pluginConfigExists ? "尚未生成；可以短时加载插件来创建默认配置" : bttbValidationError || (pluginConfigDirty ? "有未保存的修改" : "使用插件原生配置路径")}</span>
                         {#if pluginConfigExists}
-                          <button type="button" class="plugin-config-save" disabled={selectedInitializing || loadingPluginConfig || savingPluginConfig || !pluginConfigDirty} onclick={() => void savePluginConfig()}>{savingPluginConfig ? "保存中…" : "保存配置"}</button>
+                          <button type="button" class="plugin-config-save" disabled={selectedInitializing || loadingPluginConfig || savingPluginConfig || !pluginConfigDirty || Boolean(bttbValidationError)} onclick={() => void savePluginConfig()}>{savingPluginConfig ? "保存中…" : "保存配置"}</button>
                         {:else}
                           <button type="button" class="plugin-config-save" disabled={selectedInitializing || loadingPluginConfig} onclick={() => void generatePluginConfig()}>{selectedInitializing ? "正在生成…" : "生成默认配置"}</button>
                         {/if}

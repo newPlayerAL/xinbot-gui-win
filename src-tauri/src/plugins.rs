@@ -473,12 +473,16 @@ pub fn sync_server_plugins(
                     ));
                 }
                 [dependency] => *dependency,
-                _ => {
-                    return Err(format!(
-                        "插件依赖 {} 存在多个同名版本，请只保留一个",
-                        dependency_name
-                    ));
-                }
+                _ => matches
+                    .iter()
+                    .copied()
+                    .find(|plugin| plugin.source == "bundled")
+                    .ok_or_else(|| {
+                        format!(
+                            "插件依赖 {} 存在多个同名版本，请只保留一个",
+                            dependency_name
+                        )
+                    })?,
             };
             if dependency.plugin_type == META_PLUGIN {
                 return Err(format!(

@@ -13,6 +13,8 @@ Tauri 2、Rust 和 Svelte 开发。
 - Meta 插件与普通插件分开管理；支持导入本地插件 JAR 和浏览官方插件目录。
 - 插件按服务器分别配置。对于已知插件，可以直接编辑原生配置文件；也可以短时加载插件，
   让插件生成默认配置后退出，全程不会连接 Minecraft 服务器。
+- 安装包内置 BackToTheBase 及其 MovementSync 依赖，无需另行下载；BTTB 的玩家坐标、返回点、
+  管理员和语言可通过专用可视化界面编辑，并保留高级 JSON 模式。
 - 首次运行时下载独立 Java 21 运行环境，校验 SHA-256 后存入应用数据目录，不修改系统
   `PATH`。默认使用 Azul Zulu，并自动回退到 Eclipse Temurin 或 Microsoft OpenJDK。
 - 内置针对 Windows x86-64 精简的 XinBot Core，同时保留 Core 的通用跨平台构建方式。
@@ -61,7 +63,8 @@ npm run dev
 ```
 
 完整 Windows 构建还需要 Rust MSVC target、Tauri 2 Windows 构建依赖、Java 17+ 和 Maven。
-请先按照英文 README 中的目录结构构建 XinBot Core、DirectConnect 和 ChatFilter，然后执行：
+请先按照英文 README 中的目录结构构建 XinBot Core、DirectConnect 和 ChatFilter，然后执行。
+资源准备脚本会校验并获取 BTTB/MovementSync 上游文件，再生成不重复包含 Core 的精简依赖包：
 
 ```powershell
 ./scripts/prepare-resources.ps1
