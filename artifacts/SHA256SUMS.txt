@@ -1,1 +1,2 @@
 ff69e3b37b2837685b6334e9bcd16b0654289f56f160f8cf5a9b14e93d82cfd3  XinBot_0.2.8_x64-setup.exe
+e1c48ba71bc4fc2912ee4490689210cd32e562f28b30eb6fecb19d5183751d4c  xinbot-core-2.4.3-gui-0.2.8-source.tar.gz

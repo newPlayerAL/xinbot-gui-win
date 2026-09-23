@@ -4,6 +4,7 @@ src-tauri/target/
 bundled-plugins/*/target/
 src-tauri/resources/*.jar
 artifacts/*.exe
+artifacts/*.tar.gz
 rdp-screenshot-*.png
 *.log
 .DS_Store

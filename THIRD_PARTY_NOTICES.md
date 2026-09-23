@@ -5,7 +5,7 @@ available at the linked repositories.
 
 | Component | Version/source | License |
 | --- | --- | --- |
-| XinBot Core | [2.4.3 with GUI integration changes](https://github.com/newPlayerAL/xinbot/tree/xinbot-gui-win-v0.2.8-core) | GPL-3.0-or-later |
+| XinBot Core | [2.4.3 with GUI integration changes](https://github.com/newPlayerAL/xinbot-gui-win/releases/download/v0.2.8/xinbot-core-2.4.3-gui-0.2.8-source.tar.gz) | GPL-3.0-or-later |
 | XinMetaPlugin | [1.1.0-RELEASE](https://github.com/huangdihd/XinMetaPlugin/tree/1.1.0-RELEASE) | GPL-3.0 |
 | DirectConnect | [1.0.0 source](bundled-plugins/directconnect) | GPL-3.0-or-later |
 | ChatFilter | [1.0.0-RELEASE source](https://github.com/newPlayerAL/ChatFilter) | GPL-3.0 |

@@ -72,9 +72,13 @@ npm run dev
 A complete Windows build also needs Rust with the MSVC target, the Tauri 2 Windows prerequisites,
 Java 17+ and Maven. Build the companion projects first and place them next to this repository:
 
+For version 0.2.8, download and extract the
+[matching XinBot Core source archive](https://github.com/newPlayerAL/xinbot-gui-win/releases/download/v0.2.8/xinbot-core-2.4.3-gui-0.2.8-source.tar.gz)
+as `workspace/xinbot`.
+
 ```text
 workspace/
-  xinbot/          newPlayerAL/xinbot, tag xinbot-gui-win-v0.2.8-core
+  xinbot/          matching Core source for this GUI release
   ChatFilter/
   xinbot-gui-win/
 ```

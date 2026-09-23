@@ -14,6 +14,7 @@ First public Windows release.
 - Unsaved plugin configuration is protected when switching, adding or deleting server profiles.
 - Irrelevant WebView context menus are disabled and plugin links use validated native URL opening.
 - XinBot Core 2.4.3 integration with a Windows x86-64 slim distribution.
+- Exact corresponding XinBot Core source provided as a separate release asset.
 - Private Java 21 download with checksum verification and provider fallback.
 - 21.28 MiB NSIS installer; existing application data is preserved during upgrades.
 

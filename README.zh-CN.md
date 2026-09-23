@@ -79,7 +79,8 @@ npm run tauri -- build --target x86_64-pc-windows-msvc
 ## 源码与许可证
 
 本项目使用 `GPL-3.0-or-later`，详见 [LICENSE](LICENSE)。安装包内 Core 和插件的源码及
-许可证链接见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+许可证链接见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。0.2.8 安装包所对应的
+XinBot Core 精确源码快照也作为同版本 GitHub Release 的独立附件提供。
 
 XinBot 与 Minecraft 是彼此独立的项目。本程序与 Mojang Studios、Microsoft 没有关联，
 也没有得到其认可。
