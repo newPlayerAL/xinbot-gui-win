@@ -5,10 +5,5 @@ bundled-plugins/*/target/
 src-tauri/resources/*.jar
 artifacts/*.exe
 artifacts/*.tar.gz
-rdp-screenshot-*.png
 *.log
 .DS_Store
-
-# Local session handoff and machine-specific remote test helper.
-BUILD_HANDOFF.md
-scripts/remote_windows.sh
