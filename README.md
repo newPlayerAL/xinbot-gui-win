@@ -14,6 +14,7 @@ _Shown with local preview data; no real account or server credentials are includ
 - Run multiple server profiles concurrently. Every profile has its own XinBot process, working
   directory, configuration, plugin set, console output and command input.
 - Edit or start another profile while bots are running; one instance does not block the others.
+- Configure an HTTP, SOCKS4, or SOCKS5 proxy separately for each server profile.
 - Manage Meta plugins separately from ordinary plugins, import local plugin JARs, and browse the
   official plugin catalog.
 - Configure plugins per server. Known native configuration files can be edited in the app, and
@@ -45,8 +46,10 @@ Upgrades preserve application data under:
 %LOCALAPPDATA%/io.github.newplayeral.xinbot-gui-win/
 ```
 
-Server profiles may contain a secondary-login password. It is stored locally in the WebView
-profile and is not encrypted; do not use a valuable password there.
+Server profiles may contain secondary-login and proxy passwords. They are stored locally in the
+WebView profile and are not encrypted; do not use valuable passwords there. The proxy setting
+only applies to XinBot Core's Minecraft server connection, not Java downloads, web access, or
+Microsoft authentication.
 
 ## Data layout
 

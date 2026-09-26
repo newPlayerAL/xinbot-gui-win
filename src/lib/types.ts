@@ -36,6 +36,11 @@ export interface LaunchRequest {
   password: string;
   onlineMode: boolean;
   loginTemplate: string;
+  proxyEnabled: boolean;
+  proxyType: "HTTP" | "SOCKS4" | "SOCKS5";
+  proxyAddress: string;
+  proxyUsername: string;
+  proxyPassword: string;
   metaPluginId: string;
   enabledPluginIds: string[];
 }

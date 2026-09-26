@@ -59,6 +59,11 @@
       password: "",
       onlineMode: false,
       loginTemplate: "/login {password}",
+      proxyEnabled: false,
+      proxyType: "SOCKS5",
+      proxyAddress: "",
+      proxyUsername: "",
+      proxyPassword: "",
       metaPluginId: "xinmeta",
       enabledPluginIds: [],
     };
@@ -74,6 +79,11 @@
       password: profile.password,
       onlineMode: profile.onlineMode,
       loginTemplate: profile.loginTemplate,
+      proxyEnabled: profile.proxyEnabled,
+      proxyType: profile.proxyType,
+      proxyAddress: profile.proxyAddress,
+      proxyUsername: profile.proxyUsername,
+      proxyPassword: profile.proxyPassword,
       metaPluginId: profile.metaPluginId,
       enabledPluginIds: [...profile.enabledPluginIds],
     };
@@ -148,9 +158,10 @@
   $: selectedMeta = metaPlugins.find((plugin) => plugin.id === form.metaPluginId);
   $: enabledPluginCount = form.enabledPluginIds.length;
   $: isDirty = JSON.stringify(form) !== savedSnapshot;
+  $: proxyReady = !form.proxyEnabled || proxyAddressLooksValid(form.proxyAddress);
   $: canLaunch = Boolean(
     runtimeReady && status?.xinbotReady && form.host.trim() && form.username.trim()
-      && metaPlugins.some((plugin) => plugin.id === form.metaPluginId) && !selectedBusy,
+      && proxyReady && metaPlugins.some((plugin) => plugin.id === form.metaPluginId) && !selectedBusy,
   );
   $: progressPercent =
     progress?.total && progress.total > 0
@@ -177,6 +188,16 @@
     return icons[name] ?? "";
   }
 
+  function proxyAddressLooksValid(address: string): boolean {
+    const value = address.trim();
+    const match = value.startsWith("[")
+      ? value.match(/^\[[0-9a-fA-F:.]+\]:([0-9]+)$/)
+      : value.match(/^[^\s:/\[\]]+:([0-9]+)$/);
+    if (!match) return false;
+    const port = Number(match[1]);
+    return Number.isInteger(port) && port >= 1 && port <= 65535;
+  }
+
   function loadProfiles() {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]") as Partial<ServerProfile>[];
@@ -189,6 +210,13 @@
           serverName: item.serverName as string,
           port: typeof item.port === "number" ? item.port : null,
           onlineMode: Boolean(item.onlineMode),
+          proxyEnabled: Boolean(item.proxyEnabled),
+          proxyType: item.proxyType === "HTTP" || item.proxyType === "SOCKS4" || item.proxyType === "SOCKS5"
+            ? item.proxyType
+            : "SOCKS5",
+          proxyAddress: typeof item.proxyAddress === "string" ? item.proxyAddress : "",
+          proxyUsername: typeof item.proxyUsername === "string" ? item.proxyUsername : "",
+          proxyPassword: typeof item.proxyPassword === "string" ? item.proxyPassword : "",
           metaPluginId: typeof item.metaPluginId === "string"
             ? item.metaPluginId
             : (item.host === "2b2t.xin" ? "xinmeta" : "directconnect"),
@@ -236,6 +264,8 @@
       host: form.host.trim(),
       username: form.username.trim(),
       loginTemplate: form.loginTemplate.trim() || "/login {password}",
+      proxyAddress: form.proxyAddress.trim(),
+      proxyUsername: form.proxyUsername.trim(),
       metaPluginId: form.metaPluginId || "directconnect",
       enabledPluginIds: [...form.enabledPluginIds],
     };
@@ -810,7 +840,7 @@
         {#if configurationCollapsed}
           <div class="collapsed-heading"><div class="panel-heading-icon"><svg viewBox="0 0 24 24">{@html icon("server")}</svg></div><div><span>当前配置</span><h2>{form.serverName || "未命名服务器"}</h2></div></div>
           <div class="configuration-summary">
-            <div><span>连接目标</span><strong>{form.host}:{form.port || 25565}</strong></div>
+            <div><span>连接目标</span><strong>{form.host}:{form.port || 25565}</strong><small>{form.proxyEnabled ? `${form.proxyType} · ${form.proxyAddress || "地址未填写"}` : "不使用代理"}</small></div>
             <div><span>登录身份</span><strong>{form.username || "尚未填写"}</strong><small>{form.onlineMode ? "Microsoft 正版模式" : "离线模式"}</small></div>
             <div><span>Meta 适配</span><strong>{selectedMeta?.name ?? form.metaPluginId}</strong><small>{selectedMeta?.loginMode === "plugin" ? "登录流程由插件处理" : "GUI 登录命令模板"}</small></div>
             <div><span>普通插件</span><strong>{enabledPluginCount} 个已启用</strong></div>
@@ -838,6 +868,22 @@
                   {#if form.password && !form.onlineMode && selectedMeta?.loginMode === "template"}<label><span>登录命令模板</span><input bind:value={form.loginTemplate} placeholder="/login {password}" /></label>{/if}
                   {#if selectedMeta?.loginMode === "plugin"}<div class="managed-login-note"><svg viewBox="0 0 24 24">{@html icon("check")}</svg><span><strong>二次登录由 {selectedMeta.name} 处理</strong><small>GUI 不会再发送重复的登录命令。</small></span></div>{/if}
                   <label class="switch-label"><input type="checkbox" bind:checked={form.onlineMode} /><span class="switch"></span><span><strong>Microsoft 正版模式</strong><small>由 XinBot Core 处理账号认证</small></span></label>
+                </div>
+                <div class="config-group">
+                  <div class="group-heading"><b>3</b><div><strong>服务器连接代理</strong><small>当前实例连接 Minecraft 服务器时使用</small></div></div>
+                  <label class="switch-label"><input type="checkbox" bind:checked={form.proxyEnabled} /><span class="switch"></span><span><strong>启用代理</strong><small>支持 HTTP、SOCKS4 和 SOCKS5</small></span></label>
+                  {#if form.proxyEnabled}
+                    <div class="split-fields">
+                      <label class="proxy-type-field"><span>代理类型</span><select bind:value={form.proxyType}><option value="SOCKS5">SOCKS5</option><option value="SOCKS4">SOCKS4</option><option value="HTTP">HTTP</option></select></label>
+                      <label class="grow"><span>代理地址</span><input bind:value={form.proxyAddress} maxlength="512" placeholder="127.0.0.1:1080" /></label>
+                    </div>
+                    {#if form.proxyAddress && !proxyReady}<p class="field-note error">代理地址应使用“主机:端口”格式，例如 127.0.0.1:1080。</p>{/if}
+                    <div class="split-fields">
+                      <label class="grow"><span>代理用户名 <i>可选</i></span><input bind:value={form.proxyUsername} maxlength="256" autocomplete="off" /></label>
+                      <label class="grow"><span>代理密码 <i>可选</i></span><input type="password" bind:value={form.proxyPassword} maxlength="512" autocomplete="off" /></label>
+                    </div>
+                  {/if}
+                  <p class="field-note">仅代理 XinBot Core 到 Minecraft 服务器的连接；Java 下载、网页与 Microsoft 登录不使用此设置。代理凭据随实例保存在本机，且不加密。</p>
                 </div>
               {:else}
                 <div class="config-group plugin-group">

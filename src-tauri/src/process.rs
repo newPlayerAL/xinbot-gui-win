@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     io::{BufRead, BufReader, Read, Write},
+    net::Ipv6Addr,
     path::{Path, PathBuf},
     process::{Child, ChildStdin, Command, Stdio},
     sync::{Arc, Mutex},
@@ -60,6 +61,16 @@ pub struct LaunchRequest {
     password: String,
     online_mode: bool,
     login_template: String,
+    #[serde(default)]
+    proxy_enabled: bool,
+    #[serde(default = "default_proxy_type")]
+    proxy_type: String,
+    #[serde(default)]
+    proxy_address: String,
+    #[serde(default)]
+    proxy_username: String,
+    #[serde(default)]
+    proxy_password: String,
     #[serde(default = "default_meta_plugin")]
     meta_plugin_id: String,
     #[serde(default)]
@@ -68,6 +79,10 @@ pub struct LaunchRequest {
 
 fn default_meta_plugin() -> String {
     "directconnect".to_string()
+}
+
+fn default_proxy_type() -> String {
+    "SOCKS5".to_string()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -588,7 +603,49 @@ fn validate_request(request: &LaunchRequest) -> Result<(), String> {
     if request.username.trim().is_empty() {
         return Err("请填写用户名".to_string());
     }
+    if request.proxy_enabled {
+        let proxy_type = request.proxy_type.trim().to_ascii_uppercase();
+        if !matches!(proxy_type.as_str(), "HTTP" | "SOCKS4" | "SOCKS5") {
+            return Err("代理类型只能是 HTTP、SOCKS4 或 SOCKS5".to_string());
+        }
+        if !valid_proxy_address(&request.proxy_address) {
+            return Err("代理地址应使用“主机:端口”格式，例如 127.0.0.1:1080".to_string());
+        }
+        if request.proxy_address.chars().count() > 512 {
+            return Err("代理地址不能超过 512 个字符".to_string());
+        }
+        if request.proxy_username.chars().count() > 256 {
+            return Err("代理用户名不能超过 256 个字符".to_string());
+        }
+        if request.proxy_password.chars().count() > 512 {
+            return Err("代理密码不能超过 512 个字符".to_string());
+        }
+    }
     Ok(())
+}
+
+fn valid_proxy_address(address: &str) -> bool {
+    let address = address.trim();
+    if let Some(rest) = address.strip_prefix('[') {
+        let Some((host, port)) = rest.split_once("]:") else {
+            return false;
+        };
+        return host.parse::<Ipv6Addr>().is_ok() && valid_port(port);
+    }
+    let Some((host, port)) = address.rsplit_once(':') else {
+        return false;
+    };
+    !host.is_empty()
+        && !host.chars().any(|character| {
+            character.is_whitespace() || character.is_control() || ":/[]".contains(character)
+        })
+        && valid_port(port)
+}
+
+fn valid_port(port: &str) -> bool {
+    !port.is_empty()
+        && port.chars().all(|character| character.is_ascii_digit())
+        && port.parse::<u16>().is_ok_and(|port| port > 0)
 }
 
 fn profile_id_for_request(request: &LaunchRequest) -> String {
@@ -616,6 +673,16 @@ fn write_config(path: &Path, request: &LaunchRequest) -> Result<(), String> {
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())
         .and_then(|root| root.get("account")?.get("fullSession").cloned())
         .unwrap_or(Value::Null);
+    let proxy_info = if request.proxy_enabled {
+        json!({
+            "address": request.proxy_address.trim(),
+            "type": request.proxy_type.trim().to_ascii_uppercase(),
+            "password": request.proxy_password,
+            "username": request.proxy_username.trim()
+        })
+    } else {
+        json!({ "address": "", "type": "", "password": "", "username": "" })
+    };
     let config = json!({
         "account": {
             "fullSession": full_session,
@@ -629,8 +696,8 @@ fn write_config(path: &Path, request: &LaunchRequest) -> Result<(), String> {
         "owner": request.username.trim(),
         "plugin": { "directory": "plugins" },
         "proxy": {
-            "enable": false,
-            "info": { "address": "", "type": "", "password": "", "username": "" }
+            "enable": request.proxy_enabled,
+            "info": proxy_info
         }
     });
     let text = serde_json::to_string_pretty(&config)
@@ -730,3 +797,19 @@ fn watch_exit(app: AppHandle, profile_id: String, child: Arc<Mutex<Child>>) {
 
 #[allow(dead_code)]
 fn _assert_path_is_local(_path: &PathBuf) {}
+
+#[cfg(test)]
+mod tests {
+    use super::valid_proxy_address;
+
+    #[test]
+    fn validates_proxy_host_and_port() {
+        assert!(valid_proxy_address("127.0.0.1:1080"));
+        assert!(valid_proxy_address("proxy.example.org:8080"));
+        assert!(valid_proxy_address("[::1]:1080"));
+        assert!(!valid_proxy_address("proxy.example.org"));
+        assert!(!valid_proxy_address("proxy.example.org:0"));
+        assert!(!valid_proxy_address("proxy.example.org:+80"));
+        assert!(!valid_proxy_address("::1:1080"));
+    }
+}
